@@ -30,7 +30,7 @@ export default function PlannerScreen() {
   const todayKey = toKey(new Date());
 
   // Crossfade between week and month: fade out, swap content, fade back in.
-  const fade = useRef(new Animated.Value(1)).current;
+  const [fade] = useState(() => new Animated.Value(1));
   const scrollRef = useRef<ScrollView>(null);
   const switching = useRef(false);
 

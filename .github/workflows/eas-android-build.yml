@@ -1,0 +1,44 @@
+name: Android build (EAS)
+
+# Builds an installable APK on Expo's servers.
+#  - Add the "build-apk" label to a PR, or
+#  - run it by hand from the Actions tab.
+# Needs a repository secret called EXPO_TOKEN (see README).
+
+on:
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        type: choice
+        options: [preview, production, development]
+        default: preview
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Queue EAS build
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'build-apk'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - name: Start build
+        env:
+          PROFILE: ${{ inputs.profile || 'preview' }}
+        run: eas build --platform android --profile "$PROFILE" --non-interactive --no-wait
+      - name: Summary
+        run: echo "Build queued. Follow it at https://expo.dev (Builds tab for this project)." >> "$GITHUB_STEP_SUMMARY"
