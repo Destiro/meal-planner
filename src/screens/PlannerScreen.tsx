@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DayMeals } from '../components/DayMeals';
 import { MonthCalendar } from '../components/MonthCalendar';
@@ -28,6 +28,24 @@ export default function PlannerScreen() {
   const [picking, setPicking] = useState<Slot | null>(null);
 
   const todayKey = toKey(new Date());
+
+  // Crossfade between week and month: fade out, swap content, fade back in.
+  const fade = useRef(new Animated.Value(1)).current;
+  const scrollRef = useRef<ScrollView>(null);
+  const switching = useRef(false);
+
+  const toggleMode = () => {
+    if (switching.current) return;
+    switching.current = true;
+    const next: Mode = mode === 'week' ? 'month' : 'week';
+    Animated.timing(fade, { toValue: 0, duration: 140, useNativeDriver: true }).start(() => {
+      setMode(next);
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      Animated.timing(fade, { toValue: 1, duration: 240, useNativeDriver: true }).start(() => {
+        switching.current = false;
+      });
+    });
+  };
   const openPicker = (dateKey: string, meal: Slot['meal']) => setPicking({ dateKey, meal });
 
   const step = (dir: -1 | 1) => {
@@ -48,10 +66,10 @@ export default function PlannerScreen() {
         <Pressable onPress={() => step(-1)} hitSlop={12}>
           <Text style={styles.arrow}>‹</Text>
         </Pressable>
-        <View style={{ alignItems: 'center' }}>
+        <Animated.View style={{ alignItems: 'center', opacity: fade }}>
           <Text style={type.title}>{mode === 'week' ? 'Meal plan' : formatMonth(month)}</Text>
           {mode === 'week' && <Text style={type.small}>{formatRange(weekStart)}</Text>}
-        </View>
+        </Animated.View>
         <Pressable onPress={() => step(1)} hitSlop={12}>
           <Text style={styles.arrow}>›</Text>
         </Pressable>
@@ -59,7 +77,7 @@ export default function PlannerScreen() {
 
       <View style={styles.toolbar}>
         <Pressable
-          onPress={() => setMode(mode === 'week' ? 'month' : 'week')}
+          onPress={toggleMode}
           style={({ pressed }) => [styles.chip, pressed && { opacity: 0.6 }]}
           accessibilityLabel={`Switch to ${mode === 'week' ? 'month' : 'week'} view`}
         >
@@ -72,7 +90,14 @@ export default function PlannerScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.list}>
+      <Animated.View
+        style={{
+          flex: 1,
+          opacity: fade,
+          transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+        }}
+      >
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.list}>
         {mode === 'week' ? (
           weekDays(weekStart).map((d) => {
             const key = toKey(d);
@@ -93,6 +118,7 @@ export default function PlannerScreen() {
           </>
         )}
       </ScrollView>
+      </Animated.View>
 
       <RecipePickerModal slot={picking} onClose={() => setPicking(null)} />
     </SafeAreaView>
