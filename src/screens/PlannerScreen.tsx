@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -57,19 +58,15 @@ export default function PlannerScreen() {
       </View>
 
       <View style={styles.toolbar}>
-        <View style={styles.segmented}>
-          {(['week', 'month'] as const).map((m) => (
-            <Pressable
-              key={m}
-              onPress={() => setMode(m)}
-              style={[styles.segment, mode === m && styles.segmentActive]}
-            >
-              <Text style={[styles.segmentText, mode === m && { color: '#fff' }]}>
-                {m === 'week' ? 'Week' : 'Month'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <Pressable
+          onPress={() => setMode(mode === 'week' ? 'month' : 'week')}
+          style={({ pressed }) => [styles.chip, pressed && { opacity: 0.6 }]}
+          accessibilityLabel={`Switch to ${mode === 'week' ? 'month' : 'week'} view`}
+        >
+          <Ionicons name="calendar-outline" size={18} color={colors.accent} />
+          <Text style={styles.chipText}>{mode === 'week' ? 'Week' : 'Month'}</Text>
+          <Ionicons name="swap-horizontal" size={16} color={colors.inkSoft} />
+        </Pressable>
         <Pressable onPress={goToday} hitSlop={8}>
           <Text style={styles.today}>Today</Text>
         </Pressable>
@@ -104,13 +101,11 @@ export default function PlannerScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingBottom: spacing.sm },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingBottom: spacing.lg },
   arrow: { fontSize: 36, color: colors.accent, paddingHorizontal: spacing.md },
   toolbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  segmented: { flexDirection: 'row', backgroundColor: colors.accentSoft, borderRadius: radius.sm, padding: 3 },
-  segment: { paddingVertical: 6, paddingHorizontal: spacing.lg, borderRadius: radius.sm - 2 },
-  segmentActive: { backgroundColor: colors.accent },
-  segmentText: { fontSize: 14, fontWeight: '600', color: colors.accent },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingVertical: 7, paddingHorizontal: spacing.md },
+  chipText: { fontSize: 14, fontWeight: '600', color: colors.ink },
   today: { fontSize: 14, fontWeight: '600', color: colors.accent },
   list: { padding: spacing.lg, paddingTop: 0, gap: spacing.md },
   card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.line },
