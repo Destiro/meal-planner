@@ -30,3 +30,19 @@ export const formatRange = (start: Date): string => {
   const opts = { day: 'numeric', month: 'short' } as const;
   return `${start.toLocaleDateString(undefined, opts)} – ${end.toLocaleDateString(undefined, opts)}`;
 };
+
+export const startOfMonth = (d: Date): Date => new Date(d.getFullYear(), d.getMonth(), 1);
+
+export const addMonths = (d: Date, n: number): Date => new Date(d.getFullYear(), d.getMonth() + n, 1);
+
+export const formatMonth = (d: Date): string =>
+  d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+/** All days to draw for a month grid: whole weeks, Monday first. */
+export const monthGrid = (month: Date): Date[] => {
+  const first = startOfMonth(month);
+  const gridStart = startOfWeek(first);
+  const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  const weeks = Math.ceil(((last.getTime() - gridStart.getTime()) / 86400000 + 1) / 7);
+  return Array.from({ length: weeks * 7 }, (_, i) => addDays(gridStart, i));
+};

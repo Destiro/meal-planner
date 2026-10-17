@@ -1,116 +1,118 @@
-import React, { useMemo, useState } from 'react';
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button } from '../components/Button';
-import { addDays, formatDay, formatRange, startOfWeek, toKey, weekDays } from '../dates';
-import { useStore } from '../store';
+import { DayMeals } from '../components/DayMeals';
+import { MonthCalendar } from '../components/MonthCalendar';
+import { RecipePickerModal, Slot } from '../components/RecipePickerModal';
+import {
+  addDays,
+  addMonths,
+  formatDay,
+  formatMonth,
+  formatRange,
+  startOfMonth,
+  startOfWeek,
+  toKey,
+  weekDays,
+} from '../dates';
 import { colors, radius, spacing, type } from '../theme';
-import { MEAL_TYPES, MealType } from '../types';
 
-interface Slot {
-  dateKey: string;
-  meal: MealType;
-}
+type Mode = 'week' | 'month';
 
 export default function PlannerScreen() {
-  const { recipes, plan, setMeal } = useStore();
+  const [mode, setMode] = useState<Mode>('week');
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [month, setMonth] = useState(() => startOfMonth(new Date()));
+  const [selected, setSelected] = useState(() => new Date());
   const [picking, setPicking] = useState<Slot | null>(null);
 
-  const days = useMemo(() => weekDays(weekStart), [weekStart]);
-  const recipeName = (id?: string) => recipes.find((r) => r.id === id)?.name;
   const todayKey = toKey(new Date());
+  const openPicker = (dateKey: string, meal: Slot['meal']) => setPicking({ dateKey, meal });
+
+  const step = (dir: -1 | 1) => {
+    if (mode === 'week') setWeekStart(addDays(weekStart, 7 * dir));
+    else setMonth(addMonths(month, dir));
+  };
+
+  const goToday = () => {
+    const now = new Date();
+    setWeekStart(startOfWeek(now));
+    setMonth(startOfMonth(now));
+    setSelected(now);
+  };
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => setWeekStart(addDays(weekStart, -7))} hitSlop={12}>
+        <Pressable onPress={() => step(-1)} hitSlop={12}>
           <Text style={styles.arrow}>‹</Text>
         </Pressable>
         <View style={{ alignItems: 'center' }}>
-          <Text style={type.title}>Meal plan</Text>
-          <Text style={type.small}>{formatRange(weekStart)}</Text>
+          <Text style={type.title}>{mode === 'week' ? 'Meal plan' : formatMonth(month)}</Text>
+          {mode === 'week' && <Text style={type.small}>{formatRange(weekStart)}</Text>}
         </View>
-        <Pressable onPress={() => setWeekStart(addDays(weekStart, 7))} hitSlop={12}>
+        <Pressable onPress={() => step(1)} hitSlop={12}>
           <Text style={styles.arrow}>›</Text>
         </Pressable>
       </View>
 
+      <View style={styles.toolbar}>
+        <View style={styles.segmented}>
+          {(['week', 'month'] as const).map((m) => (
+            <Pressable
+              key={m}
+              onPress={() => setMode(m)}
+              style={[styles.segment, mode === m && styles.segmentActive]}
+            >
+              <Text style={[styles.segmentText, mode === m && { color: '#fff' }]}>
+                {m === 'week' ? 'Week' : 'Month'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Pressable onPress={goToday} hitSlop={8}>
+          <Text style={styles.today}>Today</Text>
+        </Pressable>
+      </View>
+
       <ScrollView contentContainerStyle={styles.list}>
-        {days.map((d) => {
-          const key = toKey(d);
-          const isToday = key === todayKey;
-          return (
-            <View key={key} style={[styles.card, isToday && styles.cardToday]}>
-              <Text style={type.heading}>{formatDay(d)}</Text>
-              {MEAL_TYPES.map((meal) => {
-                const name = recipeName(plan[key]?.[meal]);
-                return (
-                  <Pressable
-                    key={meal}
-                    style={styles.slot}
-                    onPress={() => setPicking({ dateKey: key, meal })}
-                  >
-                    <Text style={styles.mealLabel}>{meal}</Text>
-                    <Text style={name ? type.body : styles.empty}>{name ?? 'Add a meal'}</Text>
-                  </Pressable>
-                );
-              })}
+        {mode === 'week' ? (
+          weekDays(weekStart).map((d) => {
+            const key = toKey(d);
+            return (
+              <View key={key} style={[styles.card, key === todayKey && styles.cardToday]}>
+                <Text style={type.heading}>{formatDay(d)}</Text>
+                <DayMeals dateKey={key} onPickSlot={openPicker} />
+              </View>
+            );
+          })
+        ) : (
+          <>
+            <MonthCalendar month={month} selectedKey={toKey(selected)} onSelect={setSelected} />
+            <View style={styles.card}>
+              <Text style={type.heading}>{formatDay(selected)}</Text>
+              <DayMeals dateKey={toKey(selected)} onPickSlot={openPicker} />
             </View>
-          );
-        })}
+          </>
+        )}
       </ScrollView>
 
-      <Modal visible={!!picking} animationType="slide" transparent onRequestClose={() => setPicking(null)}>
-        <View style={styles.backdrop}>
-          <View style={styles.sheet}>
-            <Text style={type.heading}>Choose a recipe</Text>
-            <FlatList
-              data={recipes}
-              keyExtractor={(r) => r.id}
-              style={{ marginVertical: spacing.md }}
-              ListEmptyComponent={<Text style={type.small}>No recipes yet. Add one in the Recipes tab.</Text>}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={styles.option}
-                  onPress={() => {
-                    if (picking) setMeal(picking.dateKey, picking.meal, item.id);
-                    setPicking(null);
-                  }}
-                >
-                  <Text style={type.body}>{item.name}</Text>
-                </Pressable>
-              )}
-            />
-            <View style={{ gap: spacing.sm }}>
-              <Button
-                label="Clear this meal"
-                variant="quiet"
-                onPress={() => {
-                  if (picking) setMeal(picking.dateKey, picking.meal, null);
-                  setPicking(null);
-                }}
-              />
-              <Button label="Cancel" variant="quiet" onPress={() => setPicking(null)} />
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <RecipePickerModal slot={picking} onClose={() => setPicking(null)} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingBottom: spacing.sm },
   arrow: { fontSize: 36, color: colors.accent, paddingHorizontal: spacing.md },
+  toolbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  segmented: { flexDirection: 'row', backgroundColor: colors.accentSoft, borderRadius: radius.sm, padding: 3 },
+  segment: { paddingVertical: 6, paddingHorizontal: spacing.lg, borderRadius: radius.sm - 2 },
+  segmentActive: { backgroundColor: colors.accent },
+  segmentText: { fontSize: 14, fontWeight: '600', color: colors.accent },
+  today: { fontSize: 14, fontWeight: '600', color: colors.accent },
   list: { padding: spacing.lg, paddingTop: 0, gap: spacing.md },
   card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.line },
   cardToday: { borderColor: colors.accent, borderWidth: 2 },
-  slot: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm + 2, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line, marginTop: spacing.sm },
-  mealLabel: { width: 90, fontSize: 13, color: colors.inkSoft, textTransform: 'capitalize' },
-  empty: { fontSize: 15, color: colors.accent },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: spacing.lg, maxHeight: '75%' },
-  option: { paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
 });
