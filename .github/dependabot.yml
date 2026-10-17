@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      dev-tools:
+        patterns: [eslint*, jest*, "@types/*", typescript]
+      navigation:
+        patterns: ["@react-navigation/*"]
+    ignore:
+      # These must move together with the Expo SDK. Upgrade them with:
+      #   npx expo install expo@latest && npx expo install --fix
+      - dependency-name: expo
+      - dependency-name: expo-*
+      - dependency-name: react
+      - dependency-name: react-native
+      - dependency-name: react-native-*
+      - dependency-name: "@expo/*"
+      - dependency-name: "@react-native-async-storage/async-storage"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
