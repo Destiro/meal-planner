@@ -1,0 +1,26 @@
+name: Create Tag on Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main # Change to master if needed
+
+jobs:
+  tag:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Git Tag
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Example: Tag with the PR number. You can also use SemVer tools to bump versions.
+          TAG_NAME="pr-${{ github.event.pull_request.number }}"
+          
+          git tag -a "$TAG_NAME" -m "Merged PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
+          git push origin "$TAG_NAME"
