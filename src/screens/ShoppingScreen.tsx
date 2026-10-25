@@ -281,7 +281,11 @@ export default function ShoppingScreen() {
           title="Edit item"
           initialText={entryToText(editing)}
           placeholder="e.g. 2 kg rice"
-          hint="Start with an amount if you like: 500 g flour, 3 eggs."
+          hint={
+            editing.kind === 'planned'
+              ? 'Start with an amount if you like: 500 g flour, 3 eggs. Your change is kept as an adjustment, so if your recipes need more or less later, this line moves with them.'
+              : 'Start with an amount if you like: 500 g flour, 3 eggs.'
+          }
           isValid={(text) => entryFromText(text) !== null}
           removeLabel={editing.kind === 'extra' ? 'Delete item' : 'Remove from this list'}
           resetLabel="Reset to what the recipes need"

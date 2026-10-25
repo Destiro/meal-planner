@@ -1,7 +1,7 @@
 import { aisleFor, matchKey } from './aisles';
 import { formatIngredient, isCountLike, parseIngredient, toBaseUnit } from './ingredients';
 import { byName, itemKey, ShoppingItem } from './shopping';
-import { ListEntry, ShoppingEdits, WeekList } from './types';
+import { ListEntry, Override, ShoppingEdits, WeekList } from './types';
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
@@ -14,6 +14,8 @@ export interface ListRow extends ShoppingItem {
   kind: 'planned' | 'extra';
   /** True for a planned item whose name or amount you changed. */
   edited: boolean;
+  /** What the recipes need right now, before your change. Only for planned items. */
+  planned?: number;
 }
 
 /** A week's hand-added lines, shaped like list rows. */
@@ -48,15 +50,29 @@ export function entryToText(entry: ListEntry): string {
   return formatIngredient({ name: entry.name, quantity: entry.quantity, unit: entry.unit || undefined });
 }
 
-/** The planned shopping list with this week's hand edits applied, sorted by name. */
+/**
+ * The planned shopping list with this week's hand edits applied, sorted by name.
+ *
+ * A change you made to a line from your recipes is kept as an adjustment, so it follows the recipes: if you
+ * reduced 8 broccoli to 7 and the recipes later need 12, the line shows 11. A line whose adjustment takes it
+ * to nothing (you already have all that is needed) is left off. A change that also switched the unit, or one
+ * saved before adjustments existed, keeps the amount you set.
+ */
 export function applyEdits(planned: ShoppingItem[], week: WeekList = EMPTY_WEEK): ListRow[] {
   const rows: ListRow[] = [];
   for (const item of planned) {
     const key = itemKey(item);
     const override = week.overrides[key];
     if (override === null) continue; // removed
-    if (override) rows.push({ ...override, aisle: aisleFor(override.name), key, kind: 'planned', edited: true });
-    else rows.push({ ...item, key, kind: 'planned', edited: false });
+    if (override) {
+      const { base, ...entry } = override;
+      const follows = base !== undefined && entry.unit === item.unit;
+      const quantity = follows ? round(entry.quantity + (item.quantity - base)) : entry.quantity;
+      if (quantity <= 0.005) continue;
+      rows.push({ ...entry, quantity, aisle: aisleFor(entry.name), key, kind: 'planned', edited: true, planned: item.quantity });
+    } else {
+      rows.push({ ...item, key, kind: 'planned', edited: false, planned: item.quantity });
+    }
   }
   for (const extra of week.extras) {
     rows.push({
@@ -81,11 +97,14 @@ export function addExtra(edits: ShoppingEdits, weekKey: string, entry: ListEntry
   return withWeek(edits, weekKey, { ...week, extras: [...week.extras, { ...entry, id }] });
 }
 
-/** Changes a row's name and amount. For a planned item this is remembered as an override. */
+/**
+ * Changes a row's name and amount. For a planned item this is remembered as an override, along with what the
+ * recipes needed at the time (`row.planned`) so the change keeps following the recipes.
+ */
 export function editRow(
   edits: ShoppingEdits,
   weekKey: string,
-  row: Pick<ListRow, 'key' | 'kind'>,
+  row: Pick<ListRow, 'key' | 'kind' | 'planned'>,
   entry: ListEntry,
 ): ShoppingEdits {
   const week = weekOf(edits, weekKey);
@@ -93,7 +112,8 @@ export function editRow(
     const id = row.key.slice('extra:'.length);
     return withWeek(edits, weekKey, { ...week, extras: week.extras.map((e) => (e.id === id ? { ...entry, id } : e)) });
   }
-  return withWeek(edits, weekKey, { ...week, overrides: { ...week.overrides, [row.key]: entry } });
+  const override: Override = row.planned === undefined ? entry : { ...entry, base: row.planned };
+  return withWeek(edits, weekKey, { ...week, overrides: { ...week.overrides, [row.key]: override } });
 }
 
 /** Removes a row: hand-added items are deleted, planned items are hidden (and can be restored). */

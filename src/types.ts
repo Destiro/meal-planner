@@ -51,12 +51,21 @@ export interface ListEntry {
   unit: string;
 }
 
+/**
+ * Your change to a line that comes from recipes. `base` is how much the recipes needed when you made it, so the
+ * change can follow them: reducing 8 broccoli to 7 is remembered as "one fewer than the recipes need". Saved
+ * changes from before this existed have no `base` and keep their amount as it is.
+ */
+export interface Override extends ListEntry {
+  base?: number;
+}
+
 /** Hand edits to one week's shopping list. */
 export interface WeekList {
   /** Items added by hand. */
   extras: (ListEntry & { id: string })[];
   /** Changes to planned items, keyed by their generated key. null means removed. */
-  overrides: Record<string, ListEntry | null>;
+  overrides: Record<string, Override | null>;
   /** Ticked rows, keyed by row key. */
   checked: Record<string, boolean>;
 }
