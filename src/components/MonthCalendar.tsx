@@ -3,7 +3,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { monthGrid, toKey } from '../dates';
 import { useStore } from '../store';
 import { colors, radius, spacing } from '../theme';
-import { MEAL_TYPES } from '../types';
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -14,7 +13,7 @@ interface Props {
 }
 
 export function MonthCalendar({ month, selectedKey, onSelect }: Props) {
-  const { plan } = useStore();
+  const { plan, settings } = useStore();
   const days = monthGrid(month);
   const todayKey = toKey(new Date());
 
@@ -32,7 +31,7 @@ export function MonthCalendar({ month, selectedKey, onSelect }: Props) {
           const key = toKey(d);
           const inMonth = d.getMonth() === month.getMonth();
           const selected = key === selectedKey;
-          const planned = MEAL_TYPES.filter((m) => plan[key]?.[m]).length;
+          const planned = settings.mealSlots.filter((s) => plan[key]?.[s.id]).length;
           return (
             <Pressable key={key} style={styles.cell} onPress={() => onSelect(d)}>
               <View

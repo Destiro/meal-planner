@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Pressable, ScrollView, ScrollViewInstance, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DayMeals } from '../components/DayMeals';
+import { MealSlotsModal } from '../components/MealSlotsModal';
 import { MonthCalendar } from '../components/MonthCalendar';
 import { RecipePickerModal, Slot } from '../components/RecipePickerModal';
 import {
@@ -16,6 +17,8 @@ import {
   toKey,
   weekDays,
 } from '../dates';
+import { weekHasMeals } from '../planUtils';
+import { useStore } from '../store';
 import { colors, radius, spacing, type } from '../theme';
 
 type Mode = 'week' | 'month';
@@ -26,12 +29,25 @@ export default function PlannerScreen() {
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selected, setSelected] = useState(() => new Date());
   const [picking, setPicking] = useState<Slot | null>(null);
+  const [editingSlots, setEditingSlots] = useState(false);
+  const { plan, copyWeekPlan } = useStore();
+
+  const previousWeek = addDays(weekStart, -7);
+  const canCopy = weekHasMeals(plan, previousWeek);
+  const copyLastWeek = () => {
+    const doCopy = () => copyWeekPlan(previousWeek, weekStart);
+    if (!weekHasMeals(plan, weekStart)) return doCopy();
+    Alert.alert('Replace this week?', "Meals already planned this week will be replaced with last week's.", [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Replace', style: 'destructive', onPress: doCopy },
+    ]);
+  };
 
   const todayKey = toKey(new Date());
 
   // Crossfade between week and month: fade out, swap content, fade back in.
   const [fade] = useState(() => new Animated.Value(1));
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const switching = useRef(false);
 
   const toggleMode = () => {
@@ -85,8 +101,16 @@ export default function PlannerScreen() {
           <Text style={styles.chipText}>{mode === 'week' ? 'Week' : 'Month'}</Text>
           <Ionicons name="swap-horizontal" size={16} color={colors.inkSoft} />
         </Pressable>
+        {mode === 'week' && (
+          <Pressable onPress={copyLastWeek} disabled={!canCopy} hitSlop={8} style={!canCopy && { opacity: 0.4 }}>
+            <Text style={styles.today}>Copy last week</Text>
+          </Pressable>
+        )}
         <Pressable onPress={goToday} hitSlop={8}>
           <Text style={styles.today}>Today</Text>
+        </Pressable>
+        <Pressable onPress={() => setEditingSlots(true)} hitSlop={8} accessibilityLabel="Choose which meals to plan">
+          <Ionicons name="options-outline" size={22} color={colors.accent} />
         </Pressable>
       </View>
 
@@ -121,6 +145,7 @@ export default function PlannerScreen() {
       </Animated.View>
 
       <RecipePickerModal slot={picking} onClose={() => setPicking(null)} />
+      <MealSlotsModal visible={editingSlots} onClose={() => setEditingSlots(false)} />
     </SafeAreaView>
   );
 }
