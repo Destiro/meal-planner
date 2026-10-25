@@ -90,6 +90,12 @@ describe('pantry instructions', () => {
     expect(prompt).toContain('NEVER say you have added');
   });
 
+  it('teaches partial removals, so removing some of an item does not remove all of it', () => {
+    const prompt = buildSystemPrompt({ pantry: [], recipes: [], slots: [], household: 2 });
+    expect(prompt).toContain('Remove | 2 shopping bags');
+    expect(prompt).toContain('never the amount that should be left');
+  });
+
   it('describes the shopping list format and keeps it apart from the pantry', () => {
     const prompt = buildSystemPrompt({ pantry: [], recipes: [], slots: [], household: 2 });
     expect(prompt).toContain('[[SHOPPING]]');

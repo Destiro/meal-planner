@@ -1,7 +1,9 @@
 import { aisleFor, matchKey } from './aisles';
-import { formatIngredient, parseIngredient, toBaseUnit } from './ingredients';
+import { formatIngredient, isCountLike, parseIngredient, toBaseUnit } from './ingredients';
 import { byName, itemKey, ShoppingItem } from './shopping';
 import { ListEntry, ShoppingEdits, WeekList } from './types';
+
+const round = (n: number) => Math.round(n * 100) / 100;
 
 export const EMPTY_WEEK: WeekList = { extras: [], overrides: {}, checked: {} };
 
@@ -13,6 +15,18 @@ export interface ListRow extends ShoppingItem {
   /** True for a planned item whose name or amount you changed. */
   edited: boolean;
 }
+
+/** A week's hand-added lines, shaped like list rows. */
+const extraRows = (week: WeekList): ListRow[] =>
+  week.extras.map((e) => ({
+    name: e.name,
+    quantity: e.quantity,
+    unit: e.unit,
+    aisle: aisleFor(e.name),
+    key: `extra:${e.id}`,
+    kind: 'extra',
+    edited: false,
+  }));
 
 const weekOf = (edits: ShoppingEdits, weekKey: string): WeekList => edits[weekKey] ?? EMPTY_WEEK;
 const withWeek = (edits: ShoppingEdits, weekKey: string, week: WeekList): ShoppingEdits => ({
@@ -119,10 +133,18 @@ export function pruneWeeks(edits: ShoppingEdits, keepFromWeekKey: string): Shopp
 }
 
 /**
- * Applies shopping list changes suggested by the assistant to one week's list. "Add" puts the item on as
- * a hand-added line (or adds to one that is already there with the same unit). "Remove" takes every line
- * with that name off the list, whether it came from your recipes or you added it, treating plurals alike.
- * Lines that can't be read are ignored. `added` and `removed` count what actually changed.
+ * Applies shopping list changes suggested by the assistant to one week's list.
+ *
+ * - "Add" puts the item on as a hand-added line. If the item is already on the list (from your recipes or added
+ *   by hand) the amount is added to that line instead, so "1 more bag of flour" makes 3 bags into 4.
+ * - "Remove" with an amount ("2 bin bags") takes off just that much, and takes the line off once nothing is
+ *   left. Hand-added lines are reduced before planned ones. An amount in a different unit is left alone,
+ *   since the two can't be compared.
+ * - "Remove" with no amount ("bin bags") takes every line with that name off the list.
+ *
+ * Plurals count as the same item. Lines that can't be read are ignored. `added`, `removed` (taken off
+ * entirely) and `reduced` (lowered but still on the list) count what actually changed. `added` counts new lines
+ * and `increased` counts existing lines that went up.
  */
 export function applyShoppingActions(
   edits: ShoppingEdits,
@@ -130,41 +152,74 @@ export function applyShoppingActions(
   rows: ListRow[],
   actions: { action: 'add' | 'remove'; text: string }[],
   makeId: () => string,
-): { edits: ShoppingEdits; added: number; removed: number } {
+): { edits: ShoppingEdits; added: number; increased: number; removed: number; reduced: number } {
   let result = edits;
   let added = 0;
+  let increased = 0;
   let removed = 0;
-  const removedKeys = new Set<string>();
+  let reduced = 0;
+  // The planned lines as they are right now, since earlier actions in the same reply may have changed them.
+  const planned = rows.filter((row) => row.kind === 'planned').map((row) => ({ ...row }));
+  const gone = new Set<string>();
 
   for (const { action, text } of actions) {
     const entry = entryFromText(text);
     if (!entry) continue;
     const key = matchKey(entry.name);
 
+    const extras = extraRows(weekOf(result, weekKey));
+    const matches = [...extras, ...planned.filter((row) => !gone.has(row.key))].filter((row) => matchKey(row.name) === key);
+
     if (action === 'add') {
-      const existing = weekOf(result, weekKey).extras.find((e) => matchKey(e.name) === key && e.unit === entry.unit);
-      result = existing
-        ? editRow(result, weekKey, { key: `extra:${existing.id}`, kind: 'extra' }, { ...entry, quantity: existing.quantity + entry.quantity })
-        : addExtra(result, weekKey, entry, makeId());
-      added++;
+      // More of something already on the list goes onto that line. Plain counts and containers add together,
+      // so "1 more flour" joins "3 bags of flour".
+      const target =
+        matches.find((row) => row.unit === entry.unit) ??
+        matches.find((row) => isCountLike(row.unit) && isCountLike(entry.unit));
+      if (target) {
+        const quantity = round(target.quantity + entry.quantity);
+        result = editRow(result, weekKey, target, { name: target.name, quantity, unit: target.unit });
+        const live = planned.find((p) => p.key === target.key);
+        if (live) live.quantity = quantity;
+        increased++;
+      } else {
+        result = addExtra(result, weekKey, entry, makeId());
+        added++;
+      }
       continue;
     }
 
-    const extras: ListRow[] = weekOf(result, weekKey).extras.map((e) => ({
-      name: e.name,
-      quantity: e.quantity,
-      unit: e.unit,
-      aisle: aisleFor(e.name),
-      key: `extra:${e.id}`,
-      kind: 'extra',
-      edited: false,
-    }));
-    const matches = [...rows, ...extras].filter((row) => matchKey(row.name) === key && !removedKeys.has(row.key));
-    for (const row of matches) {
-      result = removeRow(result, weekKey, row);
-      removedKeys.add(row.key);
+
+    if (parseIngredient(text).quantity === undefined) {
+      for (const row of matches) {
+        result = removeRow(result, weekKey, row);
+        gone.add(row.key);
+      }
+      if (matches.length) removed++;
+      continue;
     }
-    if (matches.length) removed++;
+
+    let left = entry.quantity;
+    let touched = false;
+    let partial = false;
+    for (const row of matches.filter((r) => r.unit === entry.unit)) {
+      if (left <= 0.005) break;
+      touched = true;
+      if (row.quantity <= left + 0.005) {
+        result = removeRow(result, weekKey, row);
+        gone.add(row.key);
+        left = round(left - row.quantity);
+      } else {
+        const quantity = round(row.quantity - left);
+        result = editRow(result, weekKey, row, { name: row.name, quantity, unit: row.unit });
+        const live = planned.find((p) => p.key === row.key);
+        if (live) live.quantity = quantity;
+        left = 0;
+        partial = true;
+      }
+    }
+    if (touched && partial) reduced++;
+    else if (touched) removed++;
   }
-  return { edits: result, added, removed };
+  return { edits: result, added, increased, removed, reduced };
 }

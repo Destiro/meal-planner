@@ -104,6 +104,47 @@ describe('applyPantryActions', () => {
   });
 
   it('ignores lines it cannot read', () => {
-    expect(applyPantryActions([], [{ action: 'add', text: '   ' }], makeId)).toEqual({ pantry: [], added: 0, removed: 0 });
+    expect(applyPantryActions([], [{ action: 'add', text: '   ' }], makeId)).toEqual({ pantry: [], added: 0, removed: 0, reduced: 0 });
+  });
+});
+
+describe('applyPantryActions: using up an amount', () => {
+  const makeId = () => 'x';
+
+  it('lowers the amount ("I used 200 g of rice") and keeps the rest', () => {
+    const result = applyPantryActions([have('rice', 500, 'g')], [{ action: 'remove', text: '200 g rice' }], makeId);
+    expect(result.pantry).toEqual([have('rice', 300, 'g')]);
+    expect(result).toMatchObject({ removed: 0, reduced: 1 });
+  });
+
+  it('takes the item out when it is all used up, or more than it', () => {
+    for (const text of ['500 g rice', '1 kg rice']) {
+      const result = applyPantryActions([have('rice', 500, 'g')], [{ action: 'remove', text }], makeId);
+      expect(result.pantry).toEqual([]);
+      expect(result).toMatchObject({ removed: 1, reduced: 0 });
+    }
+  });
+
+  it('still removes the whole item when no amount is given', () => {
+    const result = applyPantryActions([have('rice', 500, 'g')], [{ action: 'remove', text: 'rice' }], makeId);
+    expect(result.pantry).toEqual([]);
+  });
+
+  it('leaves things alone when the amount cannot be compared or the item is a staple', () => {
+    const start = [have('milk', 500, 'ml'), have('salt', undefined)];
+    const result = applyPantryActions(start, [{ action: 'remove', text: '2 milk' }, { action: 'remove', text: '1 tsp salt' }], makeId);
+    expect(result.pantry).toEqual(start);
+    expect(result).toMatchObject({ removed: 0, reduced: 0 });
+  });
+});
+
+describe('addToPantry: counts and containers', () => {
+  it('adds a bare count to containers of the same thing, but not to a weight', () => {
+    let pantry = addToPantry([], { name: 'flour', quantity: 2, unit: 'bag' }, 'a');
+    pantry = addToPantry(pantry, { name: 'bags of flour', quantity: 1, unit: '' }, 'b');
+    expect(pantry).toEqual([{ id: 'a', name: 'flour', quantity: 3, unit: 'bag' }]);
+
+    const weighed = addToPantry([have('flour', 500, 'g')], { name: 'flour', quantity: 1, unit: 'bag' }, 'c');
+    expect(weighed).toHaveLength(2);
   });
 });

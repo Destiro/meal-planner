@@ -13,6 +13,28 @@ const UNIT_ALIASES: Record<string, string> = {
   lb: 'lb', lbs: 'lb', pound: 'lb', pounds: 'lb',
 };
 
+/**
+ * Containers and portions, kept as units so "3 bags of flour" is 3 bags of flour, and "1 more bag of flour"
+ * adds to it. Stored in the singular.
+ */
+const CONTAINER_UNITS = ['bag', 'pack', 'packet', 'can', 'tin', 'jar', 'bottle', 'box', 'carton', 'bunch', 'loaf', 'tub', 'clove', 'slice', 'head'];
+
+const IRREGULAR_PLURALS: Record<string, string> = { box: 'boxes', bunch: 'bunches', loaf: 'loaves' };
+
+/** The plural of a unit when the amount isn't one: "bag" becomes "bags", "cup" becomes "cups". */
+export function pluralUnit(unit: string): string {
+  if (IRREGULAR_PLURALS[unit]) return IRREGULAR_PLURALS[unit];
+  return CONTAINER_UNITS.includes(unit) || unit === 'cup' ? `${unit}s` : unit;
+}
+
+for (const unit of CONTAINER_UNITS) {
+  UNIT_ALIASES[unit] = unit;
+  UNIT_ALIASES[pluralUnit(unit)] = unit;
+}
+
+/** True for plain counts and containers, which can be added together ("3 bags" and "1 more flour"). */
+export const isCountLike = (unit: string): boolean => unit === '' || CONTAINER_UNITS.includes(unit);
+
 /** Weights and volumes are added up in g / ml, then shown as kg / l when large. */
 const BASE_UNITS: Record<string, { base: string; factor: number }> = {
   g: { base: 'g', factor: 1 },
@@ -34,19 +56,56 @@ function parseNumber(text: string): number | undefined {
   return Number.isFinite(n) && t !== '' ? n : undefined;
 }
 
+// An amount after the name, set off by a space, comma, dash or bracket: "flour 2 bags", "eggs x6", "pasta, 500g".
+const TRAILING_AMOUNT =
+  /^(.*?\S)(?:\s+|\s*[,:(–-]\s*)(?:[x×]\s*)?(\d+(?:[.,]\d+)?|\d+\s*\/\s*\d+)\s*[x×]?\s*([a-zA-Z.]*)\s*\)?$/i;
+
 /**
- * Reads one line such as "200g rice", "2 eggs", "1 1/2 cups of milk" or "salt".
+ * Reads an amount written after the name: "flour 2 bags", "flour x2", "flour (2 bags)", "pasta 500g".
+ * Returns null unless it is clearly an amount: the word after the number must be a unit we know, or there must
+ * be none, and the number must be sensible. So "vitamin b12" and "pasta 2 large" are left as plain names.
+ */
+function parseTrailingAmount(text: string): Ingredient | null {
+  const m = text.match(TRAILING_AMOUNT);
+  if (!m) return null;
+  const name = m[1].trim();
+  const quantity = parseNumber(m[2]);
+  const word = m[3].toLowerCase().replace(/\.$/, '');
+  const unit = word ? UNIT_ALIASES[word] : undefined;
+  if (quantity === undefined || quantity <= 0 || quantity > 999 || !/[a-z]/i.test(name)) return null;
+  if (word && !unit) return null;
+  return { name, quantity, ...(unit ? { unit } : {}) };
+}
+
+/**
+ * Reads one line such as "200g rice", "2 eggs", "1 1/2 cups of milk", "flour 2 bags" or "salt".
  * A word after the number only counts as a unit if we recognise it, so "2 eggs" stays a count of eggs.
  */
 export function parseIngredient(line: string): Ingredient {
   const text = line.trim();
-  const m = text.match(/^(\d+\s+\d+\s*\/\s*\d+|\d+\s*\/\s*\d+|\d+(?:[.,]\d+)?)\s*([^\s\d]*)\s*(.*)$/);
-  const quantity = m ? parseNumber(m[1]) : undefined;
-  if (!m || quantity === undefined || quantity <= 0) return { name: text };
+  // "a bag of flour" has no number but means one bag.
+  const bare = text.match(/^(?:an?\s+|one\s+)?([a-z]+)\s+of\s+(.+)$/i);
+  const bareUnit = bare ? UNIT_ALIASES[bare[1].toLowerCase()] : undefined;
+  if (bare && bareUnit && CONTAINER_UNITS.includes(bareUnit)) return { name: bare[2].trim(), quantity: 1, unit: bareUnit };
 
-  const unit = UNIT_ALIASES[m[2].toLowerCase().replace(/\.$/, '')];
+  // The number, any space after it, the next word, and everything else.
+  const m = text.match(/^(\d+\s+\d+\s*\/\s*\d+|\d+\s*\/\s*\d+|\d+(?:[.,]\d+)?)(\s*)([^\s\d]*)\s*(.*)$/);
+  const quantity = m ? parseNumber(m[1]) : undefined;
+  if (!m || quantity === undefined || quantity <= 0) return parseTrailingAmount(text) ?? { name: text };
+
+  const [, , space, word, remainder] = m;
+  const unit = UNIT_ALIASES[word.toLowerCase().replace(/\.$/, '')];
+  // "2x flour" and "3 × eggs": the x is a times sign, not part of the name.
+  const times = /^[x×]$/i.test(word);
+  // A word stuck to the number that isn't a unit is part of a name, like "7up".
+  if (!unit && !times && word && !space) return { name: text };
+  if (times) {
+    // "2x bags of flour" is two bags of flour: let the rest say what the 2 counts.
+    const inner = parseIngredient(remainder);
+    if (inner.unit && inner.quantity === 1) return { name: inner.name, quantity, unit: inner.unit };
+  }
   // Without a unit, the word we just read is the start of the name ("2 eggs").
-  const rest = unit ? m[3] : `${m[2]} ${m[3]}`;
+  const rest = unit || times ? remainder : `${word} ${remainder}`;
   const name = rest.replace(/^of\s+/i, '').trim();
   return name ? { name, quantity, ...(unit ? { unit } : {}) } : { name: text };
 }
@@ -65,14 +124,14 @@ export function formatAmount(quantity: number, unit: string): string {
     u = unit === 'g' ? 'kg' : 'l';
   }
   if (!u) return q === 1 ? '' : `×${formatQuantity(q)}`;
-  if (u === 'cup' && q !== 1) u = 'cups';
+  if (q !== 1) u = pluralUnit(u);
   return `${formatQuantity(q)} ${u}`;
 }
 
 /** The text form of an ingredient, the inverse of parseIngredient. */
 export function formatIngredient(ing: Ingredient): string {
   if (ing.quantity === undefined) return ing.name;
-  const unit = ing.unit === 'cup' && ing.quantity !== 1 ? 'cups' : ing.unit;
+  const unit = ing.unit && ing.quantity !== 1 ? pluralUnit(ing.unit) : ing.unit;
   return [formatQuantity(ing.quantity), unit, ing.name].filter(Boolean).join(' ');
 }
 

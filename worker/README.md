@@ -45,4 +45,11 @@ Then `npm run dev` and open <http://localhost:8787/health>.
 
 ## Updating
 
-Change `src/index.ts`, then `npm run deploy`. The key stays set between deploys.
+From the project folder, `npm start` deploys the Worker automatically when anything in `worker/src`,
+`wrangler.jsonc` or `package.json` has changed since the last successful deploy from this computer, then starts
+Expo. If the deploy fails (offline, not logged in) the app still starts. `npm run deploy:worker` deploys on demand.
+
+You can also deploy by hand: `npm run deploy` in this folder. The key stays set between deploys.
+
+Note that `npm start` deploys whatever is checked out, so switching branches and starting the app deploys that
+branch's Worker.

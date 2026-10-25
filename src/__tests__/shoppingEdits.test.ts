@@ -142,7 +142,118 @@ describe('applyShoppingActions', () => {
 
   it('ignores unreadable lines and does not change the input', () => {
     const before = JSON.stringify(none);
-    expect(applyShoppingActions(none, WEEK, rows, [{ action: 'add', text: '  ' }], makeId)).toEqual({ edits: none, added: 0, removed: 0 });
+    expect(applyShoppingActions(none, WEEK, rows, [{ action: 'add', text: '  ' }], makeId)).toEqual({ edits: none, added: 0, increased: 0, removed: 0, reduced: 0 });
     expect(JSON.stringify(none)).toBe(before);
+  });
+});
+
+describe('applyShoppingActions: removing an amount', () => {
+  let n = 0;
+  const makeId = () => `m${++n}`;
+  const bags = (quantity: number) => addExtra(none, WEEK, { name: 'shopping bags', quantity, unit: '' }, 'bags');
+  const bagQuantities = (edits: ShoppingEdits) => edits[WEEK].extras.map((e) => [e.name, e.quantity]);
+
+  it('takes off just the amount asked for ("remove 2 of the 3 shopping bags")', () => {
+    const result = applyShoppingActions(bags(3), WEEK, [], [{ action: 'remove', text: '2 shopping bags' }], makeId);
+    expect(bagQuantities(result.edits)).toEqual([['shopping bags', 1]]);
+    expect(result).toMatchObject({ removed: 0, reduced: 1 });
+  });
+
+  it('still removes the whole item when no amount is given', () => {
+    const result = applyShoppingActions(bags(3), WEEK, [], [{ action: 'remove', text: 'shopping bags' }], makeId);
+    expect(result.edits[WEEK].extras).toEqual([]);
+    expect(result).toMatchObject({ removed: 1, reduced: 0 });
+  });
+
+  it('removes the line when the amount covers all of it, or more', () => {
+    for (const text of ['3 shopping bags', '5 shopping bags']) {
+      const result = applyShoppingActions(bags(3), WEEK, [], [{ action: 'remove', text }], makeId);
+      expect(result.edits[WEEK].extras).toEqual([]);
+      expect(result).toMatchObject({ removed: 1, reduced: 0 });
+    }
+  });
+
+  it('reduces planned items too, keeping what is left, and converts kg to g', () => {
+    const rows = applyEdits(planned);
+    const result = applyShoppingActions(none, WEEK, rows, [{ action: 'remove', text: '0.2 kg rice' }], makeId);
+    expect(result.reduced).toBe(1);
+    expect(applyEdits(planned, result.edits[WEEK]).find((r) => r.name === 'rice')).toMatchObject({ quantity: 500, edited: true });
+  });
+
+  it('uses up hand-added lines before planned ones', () => {
+    const extra = addExtra(none, WEEK, { name: 'rice', quantity: 100, unit: 'g' }, 'r');
+    const rows = applyEdits(planned, extra[WEEK]);
+    const result = applyShoppingActions(extra, WEEK, rows, [{ action: 'remove', text: '300 g rice' }], makeId);
+    expect(result.edits[WEEK].extras).toEqual([]);
+    expect(applyEdits(planned, result.edits[WEEK]).find((r) => r.name === 'rice')).toMatchObject({ quantity: 500 });
+  });
+
+  it('leaves an item alone when the unit differs, since the amounts cannot be compared', () => {
+    const rows = applyEdits(planned);
+    const result = applyShoppingActions(none, WEEK, rows, [{ action: 'remove', text: '2 rice' }], makeId);
+    expect(result).toMatchObject({ removed: 0, reduced: 0 });
+    expect(applyEdits(planned, result.edits[WEEK]).find((r) => r.name === 'rice')).toMatchObject({ quantity: 700 });
+  });
+
+  it('handles several removals of the same item in one reply', () => {
+    const result = applyShoppingActions(
+      bags(5),
+      WEEK,
+      [],
+      [{ action: 'remove', text: '2 shopping bags' }, { action: 'remove', text: '1 shopping bags' }],
+      makeId,
+    );
+    expect(bagQuantities(result.edits)).toEqual([['shopping bags', 2]]);
+  });
+});
+
+describe('applyShoppingActions: adding more of something already there', () => {
+  let n = 0;
+  const makeId = () => `a${++n}`;
+  const quantities = (edits: ShoppingEdits) => edits[WEEK].extras.map((e) => [e.name, e.quantity, e.unit]);
+
+  it('adds "1 more bag of flour" to the 3 bags already on the list', () => {
+    const start = addExtra(none, WEEK, { name: 'flour', quantity: 3, unit: 'bag' }, 'f');
+    const result = applyShoppingActions(start, WEEK, [], [{ action: 'add', text: '1 bag of flour' }], makeId);
+    expect(quantities(result.edits)).toEqual([['flour', 4, 'bag']]);
+    expect(result).toMatchObject({ added: 0, increased: 1 });
+  });
+
+  it('also finds the line when it was saved earlier as "bags of flour" with no unit', () => {
+    const start = addExtra(none, WEEK, { name: 'bags of flour', quantity: 3, unit: '' }, 'f');
+    const result = applyShoppingActions(start, WEEK, [], [{ action: 'add', text: '1 bag of flour' }], makeId);
+    expect(quantities(result.edits)).toEqual([['bags of flour', 4, '']]);
+  });
+
+  it('counts a bare "1 flour" as one more of the bags', () => {
+    const start = addExtra(none, WEEK, { name: 'flour', quantity: 3, unit: 'bag' }, 'f');
+    const result = applyShoppingActions(start, WEEK, [], [{ action: 'add', text: '1 flour' }], makeId);
+    expect(quantities(result.edits)).toEqual([['flour', 4, 'bag']]);
+  });
+
+  it('does not mix a weight with a count', () => {
+    const start = addExtra(none, WEEK, { name: 'flour', quantity: 500, unit: 'g' }, 'f');
+    const result = applyShoppingActions(start, WEEK, [], [{ action: 'add', text: '1 bag of flour' }], makeId);
+    expect(quantities(result.edits)).toEqual([['flour', 500, 'g'], ['flour', 1, 'bag']]);
+    expect(result).toMatchObject({ added: 1, increased: 0 });
+  });
+
+  it('adds to a planned line from your recipes instead of repeating it', () => {
+    const rows = applyEdits(planned);
+    const result = applyShoppingActions(none, WEEK, rows, [{ action: 'add', text: '200 g rice' }], makeId);
+    expect(result).toMatchObject({ added: 0, increased: 1 });
+    expect(result.edits[WEEK].extras).toEqual([]);
+    expect(applyEdits(planned, result.edits[WEEK]).find((r) => r.name === 'rice')).toMatchObject({ quantity: 900, edited: true });
+  });
+
+  it('keeps adding up across several lines in one reply', () => {
+    const result = applyShoppingActions(
+      none,
+      WEEK,
+      [],
+      [{ action: 'add', text: '1 bag of flour' }, { action: 'add', text: '2 bags of flour' }, { action: 'remove', text: '1 bag flour' }],
+      makeId,
+    );
+    expect(quantities(result.edits)).toEqual([['flour', 2, 'bag']]);
   });
 });

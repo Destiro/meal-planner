@@ -43,3 +43,6 @@ yarn-error.*
 # Cloudflare Worker: local secrets and build output
 worker/.dev.vars*
 worker/.wrangler/
+
+# Remembers which Worker code was last deployed from this computer
+worker/.last-deploy
