@@ -9,7 +9,7 @@ import { addToPantry } from '../pantry';
 import { canDecrease, formatQuantityLabel, nextQuantity } from '../quantity';
 import { AisleSection, formatShoppingText, groupByAisle } from '../shopping';
 import {
-  addExtra,
+  applyShoppingActions,
   editRow,
   EMPTY_WEEK,
   entryFromText,
@@ -70,9 +70,11 @@ export default function ShoppingScreen() {
   };
 
   const addItem = () => {
-    const entry = entryFromText(newItem);
-    if (!entry) return;
-    updateShoppingEdits((edits) => addExtra(edits, weekKey, entry, newId()));
+    if (!entryFromText(newItem)) return;
+    // Adding something already on the list raises its amount instead of repeating the line.
+    updateShoppingEdits(
+      (edits) => applyShoppingActions(edits, weekKey, rows, [{ action: 'add', text: newItem }], newId).edits,
+    );
     setNewItem('');
   };
 

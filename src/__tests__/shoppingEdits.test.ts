@@ -142,7 +142,7 @@ describe('applyShoppingActions', () => {
 
   it('ignores unreadable lines and does not change the input', () => {
     const before = JSON.stringify(none);
-    expect(applyShoppingActions(none, WEEK, rows, [{ action: 'add', text: '  ' }], makeId)).toEqual({ edits: none, added: 0, removed: 0, reduced: 0 });
+    expect(applyShoppingActions(none, WEEK, rows, [{ action: 'add', text: '  ' }], makeId)).toEqual({ edits: none, added: 0, increased: 0, removed: 0, reduced: 0 });
     expect(JSON.stringify(none)).toBe(before);
   });
 });
@@ -204,5 +204,56 @@ describe('applyShoppingActions: removing an amount', () => {
       makeId,
     );
     expect(bagQuantities(result.edits)).toEqual([['shopping bags', 2]]);
+  });
+});
+
+describe('applyShoppingActions: adding more of something already there', () => {
+  let n = 0;
+  const makeId = () => `a${++n}`;
+  const quantities = (edits: ShoppingEdits) => edits[WEEK].extras.map((e) => [e.name, e.quantity, e.unit]);
+
+  it('adds "1 more bag of flour" to the 3 bags already on the list', () => {
+    const start = addExtra(none, WEEK, { name: 'flour', quantity: 3, unit: 'bag' }, 'f');
+    const result = applyShoppingActions(start, WEEK, [], [{ action: 'add', text: '1 bag of flour' }], makeId);
+    expect(quantities(result.edits)).toEqual([['flour', 4, 'bag']]);
+    expect(result).toMatchObject({ added: 0, increased: 1 });
+  });
+
+  it('also finds the line when it was saved earlier as "bags of flour" with no unit', () => {
+    const start = addExtra(none, WEEK, { name: 'bags of flour', quantity: 3, unit: '' }, 'f');
+    const result = applyShoppingActions(start, WEEK, [], [{ action: 'add', text: '1 bag of flour' }], makeId);
+    expect(quantities(result.edits)).toEqual([['bags of flour', 4, '']]);
+  });
+
+  it('counts a bare "1 flour" as one more of the bags', () => {
+    const start = addExtra(none, WEEK, { name: 'flour', quantity: 3, unit: 'bag' }, 'f');
+    const result = applyShoppingActions(start, WEEK, [], [{ action: 'add', text: '1 flour' }], makeId);
+    expect(quantities(result.edits)).toEqual([['flour', 4, 'bag']]);
+  });
+
+  it('does not mix a weight with a count', () => {
+    const start = addExtra(none, WEEK, { name: 'flour', quantity: 500, unit: 'g' }, 'f');
+    const result = applyShoppingActions(start, WEEK, [], [{ action: 'add', text: '1 bag of flour' }], makeId);
+    expect(quantities(result.edits)).toEqual([['flour', 500, 'g'], ['flour', 1, 'bag']]);
+    expect(result).toMatchObject({ added: 1, increased: 0 });
+  });
+
+  it('adds to a planned line from your recipes instead of repeating it', () => {
+    const rows = applyEdits(planned);
+    const result = applyShoppingActions(none, WEEK, rows, [{ action: 'add', text: '200 g rice' }], makeId);
+    expect(result).toMatchObject({ added: 0, increased: 1 });
+    expect(result.edits[WEEK].extras).toEqual([]);
+    expect(applyEdits(planned, result.edits[WEEK]).find((r) => r.name === 'rice')).toMatchObject({ quantity: 900, edited: true });
+  });
+
+  it('keeps adding up across several lines in one reply', () => {
+    const result = applyShoppingActions(
+      none,
+      WEEK,
+      [],
+      [{ action: 'add', text: '1 bag of flour' }, { action: 'add', text: '2 bags of flour' }, { action: 'remove', text: '1 bag flour' }],
+      makeId,
+    );
+    expect(quantities(result.edits)).toEqual([['flour', 2, 'bag']]);
   });
 });

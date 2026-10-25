@@ -40,3 +40,17 @@ describe('aisleFor', () => {
     expect(aisleFor(name)).toBe(aisle);
   });
 });
+
+describe('matchKey and containers', () => {
+  it('ignores a container at the start, so "bags of flour" matches "flour"', () => {
+    expect(matchKey('bags of flour')).toBe('flour');
+    expect(matchKey('a can of Tomatoes')).toBe('tomato');
+    expect(matchKey('loaves of bread')).toBe('bread');
+    expect(matchKey('bags of flour')).toBe(matchKey('Flour'));
+  });
+
+  it('leaves other names alone', () => {
+    expect(matchKey('bag')).toBe('bag');
+    expect(matchKey('cup of tea')).toBe('cup of tea');
+  });
+});

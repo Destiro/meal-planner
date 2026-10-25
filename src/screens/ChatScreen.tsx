@@ -123,6 +123,7 @@ export default function ChatScreen() {
     updateShoppingEdits(() => result.edits);
     const parts = [
       result.added ? `added ${result.added} ${result.added === 1 ? 'item' : 'items'}` : null,
+      result.increased ? `increased ${result.increased} ${result.increased === 1 ? 'item' : 'items'}` : null,
       result.removed ? `removed ${result.removed} ${result.removed === 1 ? 'item' : 'items'}` : null,
       result.reduced ? `lowered ${result.reduced} ${result.reduced === 1 ? 'item' : 'items'}` : null,
     ].filter(Boolean);

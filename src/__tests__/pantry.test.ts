@@ -137,3 +137,14 @@ describe('applyPantryActions: using up an amount', () => {
     expect(result).toMatchObject({ removed: 0, reduced: 0 });
   });
 });
+
+describe('addToPantry: counts and containers', () => {
+  it('adds a bare count to containers of the same thing, but not to a weight', () => {
+    let pantry = addToPantry([], { name: 'flour', quantity: 2, unit: 'bag' }, 'a');
+    pantry = addToPantry(pantry, { name: 'bags of flour', quantity: 1, unit: '' }, 'b');
+    expect(pantry).toEqual([{ id: 'a', name: 'flour', quantity: 3, unit: 'bag' }]);
+
+    const weighed = addToPantry([have('flour', 500, 'g')], { name: 'flour', quantity: 1, unit: 'bag' }, 'c');
+    expect(weighed).toHaveLength(2);
+  });
+});

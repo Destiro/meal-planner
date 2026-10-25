@@ -1,5 +1,5 @@
 import { matchKey } from './aisles';
-import { formatIngredient, parseIngredient, toBaseUnit } from './ingredients';
+import { formatIngredient, isCountLike, parseIngredient, toBaseUnit } from './ingredients';
 import { ShoppingItem } from './shopping';
 import { PantryItem } from './types';
 
@@ -31,7 +31,11 @@ export function pantryToText(item: PantryEntry): string {
  */
 export function addToPantry(pantry: PantryItem[], entry: PantryEntry, id: string): PantryItem[] {
   const key = matchKey(entry.name);
-  const existing = pantry.find((p) => matchKey(p.name) === key && p.unit === entry.unit);
+  const sameName = pantry.filter((p) => matchKey(p.name) === key);
+  // Plain counts and containers add together, so "2 more eggs" joins "6 eggs" and "1 flour" joins "2 bags of flour".
+  const existing =
+    sameName.find((p) => p.unit === entry.unit) ??
+    sameName.find((p) => p.quantity !== undefined && isCountLike(p.unit) && isCountLike(entry.unit));
   if (existing && existing.quantity !== undefined && entry.quantity !== undefined) {
     const total = round(existing.quantity + entry.quantity);
     return pantry.map((p) => (p === existing ? { ...p, quantity: total } : p));

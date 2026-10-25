@@ -13,6 +13,28 @@ const UNIT_ALIASES: Record<string, string> = {
   lb: 'lb', lbs: 'lb', pound: 'lb', pounds: 'lb',
 };
 
+/**
+ * Containers and portions, kept as units so "3 bags of flour" is 3 bags of flour, and "1 more bag of flour"
+ * adds to it. Stored in the singular.
+ */
+const CONTAINER_UNITS = ['bag', 'pack', 'packet', 'can', 'tin', 'jar', 'bottle', 'box', 'carton', 'bunch', 'loaf', 'tub', 'clove', 'slice', 'head'];
+
+const IRREGULAR_PLURALS: Record<string, string> = { box: 'boxes', bunch: 'bunches', loaf: 'loaves' };
+
+/** The plural of a unit when the amount isn't one: "bag" becomes "bags", "cup" becomes "cups". */
+export function pluralUnit(unit: string): string {
+  if (IRREGULAR_PLURALS[unit]) return IRREGULAR_PLURALS[unit];
+  return CONTAINER_UNITS.includes(unit) || unit === 'cup' ? `${unit}s` : unit;
+}
+
+for (const unit of CONTAINER_UNITS) {
+  UNIT_ALIASES[unit] = unit;
+  UNIT_ALIASES[pluralUnit(unit)] = unit;
+}
+
+/** True for plain counts and containers, which can be added together ("3 bags" and "1 more flour"). */
+export const isCountLike = (unit: string): boolean => unit === '' || CONTAINER_UNITS.includes(unit);
+
 /** Weights and volumes are added up in g / ml, then shown as kg / l when large. */
 const BASE_UNITS: Record<string, { base: string; factor: number }> = {
   g: { base: 'g', factor: 1 },
@@ -40,6 +62,11 @@ function parseNumber(text: string): number | undefined {
  */
 export function parseIngredient(line: string): Ingredient {
   const text = line.trim();
+  // "a bag of flour" has no number but means one bag.
+  const bare = text.match(/^(?:an?\s+|one\s+)?([a-z]+)\s+of\s+(.+)$/i);
+  const bareUnit = bare ? UNIT_ALIASES[bare[1].toLowerCase()] : undefined;
+  if (bare && bareUnit && CONTAINER_UNITS.includes(bareUnit)) return { name: bare[2].trim(), quantity: 1, unit: bareUnit };
+
   const m = text.match(/^(\d+\s+\d+\s*\/\s*\d+|\d+\s*\/\s*\d+|\d+(?:[.,]\d+)?)\s*([^\s\d]*)\s*(.*)$/);
   const quantity = m ? parseNumber(m[1]) : undefined;
   if (!m || quantity === undefined || quantity <= 0) return { name: text };
@@ -65,14 +92,14 @@ export function formatAmount(quantity: number, unit: string): string {
     u = unit === 'g' ? 'kg' : 'l';
   }
   if (!u) return q === 1 ? '' : `×${formatQuantity(q)}`;
-  if (u === 'cup' && q !== 1) u = 'cups';
+  if (q !== 1) u = pluralUnit(u);
   return `${formatQuantity(q)} ${u}`;
 }
 
 /** The text form of an ingredient, the inverse of parseIngredient. */
 export function formatIngredient(ing: Ingredient): string {
   if (ing.quantity === undefined) return ing.name;
-  const unit = ing.unit === 'cup' && ing.quantity !== 1 ? 'cups' : ing.unit;
+  const unit = ing.unit && ing.quantity !== 1 ? pluralUnit(ing.unit) : ing.unit;
   return [formatQuantity(ing.quantity), unit, ing.name].filter(Boolean).join(' ');
 }
 
