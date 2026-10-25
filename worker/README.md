@@ -6,10 +6,16 @@ A tiny proxy between the app and Spoonacular, so the API key stays on Cloudflare
 |---|---|
 | `GET /recipes/search?q=pasta&number=10&offset=0` | Search, returning ingredients and instructions in one call |
 | `GET /recipes/random?number=5` | Random recipes for inspiration |
+| `POST /chat` | The cooking assistant. Takes `{ messages, context }` and returns `{ reply }` |
 | `GET /health` | Returns `ok` |
 
 Responses are cached for one hour, the most Spoonacular's terms allow. The free plan allows 50 points a day
 (a search of 10 recipes costs about 1.4), so caching matters.
+
+The assistant runs on Cloudflare Workers AI (Llama 3.3 70B), bound in `wrangler.jsonc`. It needs no key or
+secret. The free plan includes 10,000 "neurons" a day, which is roughly 50 to 70 chat turns; when it runs out
+the app shows a "daily limit" message and it works again after 00:00 UTC. To use a cheaper model, change
+`CHAT_MODEL` in `src/index.ts`.
 
 ## Setup (once)
 

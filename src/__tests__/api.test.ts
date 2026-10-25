@@ -1,4 +1,4 @@
-import { ApiError, randomOnline, searchOnline } from '../api';
+import { ApiError, chatOnline, randomOnline, searchOnline } from '../api';
 
 const reply = (status: number, body: unknown) =>
   Promise.resolve({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) } as Response);
@@ -46,5 +46,32 @@ describe('randomOnline', () => {
     const url = new URL(fetchMock.mock.calls[0][0]);
     expect(url.pathname).toBe('/recipes/random');
     expect(url.searchParams.get('number')).toBe('3');
+  });
+});
+
+describe('chatOnline', () => {
+  const context = { pantry: ['rice'], recipes: ['Soup'], slots: ['Dinner'], household: 2 };
+
+  it('posts the conversation and context and returns the reply', async () => {
+    fetchMock.mockReturnValue(reply(200, { reply: 'Try a stir fry.' }));
+    const messages = [{ role: 'user' as const, content: 'what can I cook?' }];
+    expect(await chatOnline(messages, context)).toBe('Try a stir fry.');
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(url).pathname).toBe('/chat');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ messages, context });
+  });
+
+  it('shows the daily limit message from the worker', async () => {
+    fetchMock.mockReturnValue(reply(429, { error: 'The assistant has reached its daily limit. Try again tomorrow.' }));
+    await expect(chatOnline([{ role: 'user', content: 'hi' }], context)).rejects.toThrow('daily limit');
+  });
+
+  it('rejects an empty or malformed reply', async () => {
+    fetchMock.mockReturnValue(reply(200, { reply: '  ' }));
+    await expect(chatOnline([{ role: 'user', content: 'hi' }], context)).rejects.toThrow('nothing to say');
+    fetchMock.mockReturnValue(reply(200, {}));
+    await expect(chatOnline([{ role: 'user', content: 'hi' }], context)).rejects.toBeInstanceOf(ApiError);
   });
 });

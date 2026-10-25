@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import ChatScreen from './src/screens/ChatScreen';
 import PantryScreen from './src/screens/PantryScreen';
 import PlannerScreen from './src/screens/PlannerScreen';
 import RecipesScreen from './src/screens/RecipesScreen';
@@ -20,6 +21,7 @@ const TAB_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> =
   Recipes: 'book-outline',
   Pantry: 'basket-outline',
   Shopping: 'cart-outline',
+  Assistant: 'chatbubble-ellipses-outline',
 };
 
 // React Navigation draws a round, unclipped ripple on Android that spills out of the button and under
@@ -54,6 +56,7 @@ function Root() {
         <Tab.Screen name="Recipes" component={RecipesScreen} />
         <Tab.Screen name="Pantry" component={PantryScreen} />
         <Tab.Screen name="Shopping" component={ShoppingScreen} />
+        <Tab.Screen name="Assistant" component={ChatScreen} options={{ tabBarHideOnKeyboard: true }} />
       </Tab.Navigator>
     </NavigationContainer>
   );
