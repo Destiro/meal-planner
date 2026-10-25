@@ -5,7 +5,8 @@
  *   GET /recipes/random?number=5                     random recipes for inspiration
  *   GET /health                                      "ok"
  *
- * Responses are { recipes: [...] } (search also has `total`). Errors are { error: "message" }.
+ * Responses are { recipes: [...] } (search also has `total`), each recipe with plain fields plus
+ * `ingredients` and `steps`. Errors are { error: "message" }.
  */
 
 interface Env {
@@ -21,7 +22,7 @@ const CACHE_SECONDS = 3600;
 // Each result costs quota (the free plan has 50 points a day), so keep requests small.
 const MAX_RESULTS = 20;
 
-/** The only fields passed on to the app; the rest of Spoonacular's response is dropped. */
+/** Plain fields passed on to the app as they are. Everything else in Spoonacular's response is dropped. */
 const RECIPE_FIELDS = [
   'id',
   'title',
@@ -34,15 +35,38 @@ const RECIPE_FIELDS = [
   'creditsText',
   'diets',
   'dishTypes',
-  'extendedIngredients',
-  'analyzedInstructions',
 ] as const;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
 
-const pickRecipe = (recipe: Record<string, unknown>) =>
-  Object.fromEntries(RECIPE_FIELDS.filter((field) => field in recipe).map((field) => [field, recipe[field]]));
+interface RawIngredient {
+  name?: unknown;
+  amount?: unknown;
+  unit?: unknown;
+  original?: unknown;
+}
+
+interface RawInstructionGroup {
+  steps?: { step?: unknown }[];
+}
+
+/**
+ * Flattens a Spoonacular recipe to what the app shows: the plain fields, a short ingredient list and the
+ * step text. Spoonacular repeats ingredient and equipment details on every step, which is mostly bulk.
+ */
+function shapeRecipe(recipe: Record<string, unknown>) {
+  const ingredients = Array.isArray(recipe.extendedIngredients) ? (recipe.extendedIngredients as RawIngredient[]) : [];
+  const groups = Array.isArray(recipe.analyzedInstructions) ? (recipe.analyzedInstructions as RawInstructionGroup[]) : [];
+  return {
+    ...Object.fromEntries(RECIPE_FIELDS.filter((field) => field in recipe).map((field) => [field, recipe[field]])),
+    ingredients: ingredients.map(({ name, amount, unit, original }) => ({ name, amount, unit, original })),
+    steps: groups
+      .flatMap((group) => group.steps ?? [])
+      .map((s) => s.step)
+      .filter((step): step is string => typeof step === 'string' && step.trim() !== ''),
+  };
+}
 
 /** A whole number from a query parameter, kept within 0..max. */
 function wholeNumber(raw: string | null, fallback: number, max: number): number {
@@ -92,7 +116,7 @@ async function search(url: URL, env: Env): Promise<Response> {
   if (!upstream.ok) return upstreamError(upstream.status);
 
   const data = (await upstream.json()) as { results?: Record<string, unknown>[]; totalResults?: number };
-  return json({ recipes: (data.results ?? []).map(pickRecipe), total: data.totalResults ?? 0 });
+  return json({ recipes: (data.results ?? []).map(shapeRecipe), total: data.totalResults ?? 0 });
 }
 
 async function random(url: URL, env: Env): Promise<Response> {
@@ -104,7 +128,7 @@ async function random(url: URL, env: Env): Promise<Response> {
   if (!upstream.ok) return upstreamError(upstream.status);
 
   const data = (await upstream.json()) as { recipes?: Record<string, unknown>[] };
-  return json({ recipes: (data.recipes ?? []).map(pickRecipe) });
+  return json({ recipes: (data.recipes ?? []).map(shapeRecipe) });
 }
 
 export default {
