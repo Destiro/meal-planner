@@ -19,9 +19,11 @@ import { RecipePreviewModal } from '../components/RecipePreviewModal';
 import { loadChat, saveChat, StoredMessage } from '../chatHistory';
 import { PantryAction, parseReply, PlanEntry, planToMeals, Segment } from '../chatFormat';
 import { formatDuration } from '../audio';
-import { addDays, startOfWeek } from '../dates';
+import { addDays, startOfWeek, toKey } from '../dates';
 import { formatIngredient } from '../ingredients';
 import { applyPantryActions, pantryToText } from '../pantry';
+import { applyShoppingActions } from '../shoppingEdits';
+import { shoppingRows } from '../shoppingList';
 import { newId, RecipeInput, useStore } from '../store';
 import { useVoiceInput } from '../useVoiceInput';
 import { colors, radius, spacing, type } from '../theme';
@@ -34,7 +36,7 @@ const SUGGESTIONS = [
 
 /** A cooking assistant that knows your recipes and pantry, and can suggest recipes and meal plans. */
 export default function ChatScreen() {
-  const { recipes, pantry, settings, addRecipe, setMeal, updatePantry } = useStore();
+  const { recipes, plan, pantry, settings, shoppingEdits, addRecipe, setMeal, updatePantry, updateShoppingEdits } = useStore();
   const [messages, setMessages] = useState<StoredMessage[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [input, setInput] = useState('');
@@ -111,6 +113,24 @@ export default function ChatScreen() {
     Alert.alert(parts.length ? 'Pantry updated' : 'Nothing changed', parts.length ? `You've ${parts.join(' and ')}.` : 'Those items are not in your pantry.');
   };
 
+  // Applies the assistant's suggested shopping list changes to this week's list or next week's.
+  const applyShopping = (actions: PantryAction[], weekOffset: 0 | 1) => {
+    const weekStart = addDays(startOfWeek(new Date()), 7 * weekOffset);
+    const weekKey = toKey(weekStart);
+    const { rows } = shoppingRows({ recipes, plan, settings, pantry, edits: shoppingEdits }, weekKey, weekStart);
+    const result = applyShoppingActions(shoppingEdits, weekKey, rows, actions, newId);
+    updateShoppingEdits(() => result.edits);
+    const parts = [
+      result.added ? `added ${result.added} ${result.added === 1 ? 'item' : 'items'}` : null,
+      result.removed ? `removed ${result.removed} ${result.removed === 1 ? 'item' : 'items'}` : null,
+    ].filter(Boolean);
+    const which = weekOffset === 0 ? "this week's" : "next week's";
+    Alert.alert(
+      parts.length ? 'Shopping list updated' : 'Nothing changed',
+      parts.length ? `You've ${parts.join(' and ')} on ${which} list.` : `Those items were not on ${which} list.`,
+    );
+  };
+
   const addPlan = (entries: PlanEntry[], weekOffset: 0 | 1) => {
     const weekStart = addDays(startOfWeek(new Date()), 7 * weekOffset);
     const { meals, skipped } = planToMeals(entries, recipes, settings.mealSlots, weekStart);
@@ -164,6 +184,7 @@ export default function ChatScreen() {
                 onSaveRecipe={setDraft}
                 onAddPlan={addPlan}
                 onApplyPantry={applyPantry}
+                onApplyShopping={applyShopping}
               />
             )
           }
@@ -251,12 +272,14 @@ function AssistantMessage({
   onSaveRecipe,
   onAddPlan,
   onApplyPantry,
+  onApplyShopping,
 }: {
   content: string;
   onViewRecipe: (recipe: RecipeInput) => void;
   onSaveRecipe: (recipe: RecipeInput) => void;
   onAddPlan: (entries: PlanEntry[], weekOffset: 0 | 1) => void;
   onApplyPantry: (actions: PantryAction[]) => void;
+  onApplyShopping: (actions: PantryAction[], weekOffset: 0 | 1) => void;
 }) {
   const segments = useMemo(() => parseReply(content), [content]);
   return (
@@ -269,6 +292,7 @@ function AssistantMessage({
           onSaveRecipe={onSaveRecipe}
           onAddPlan={onAddPlan}
           onApplyPantry={onApplyPantry}
+          onApplyShopping={onApplyShopping}
         />
       ))}
     </View>
@@ -281,12 +305,14 @@ function SegmentView({
   onSaveRecipe,
   onAddPlan,
   onApplyPantry,
+  onApplyShopping,
 }: {
   segment: Segment;
   onViewRecipe: (recipe: RecipeInput) => void;
   onSaveRecipe: (recipe: RecipeInput) => void;
   onAddPlan: (entries: PlanEntry[], weekOffset: 0 | 1) => void;
   onApplyPantry: (actions: PantryAction[]) => void;
+  onApplyShopping: (actions: PantryAction[], weekOffset: 0 | 1) => void;
 }) {
   if (segment.kind === 'text') {
     return (
@@ -325,6 +351,26 @@ function SegmentView({
           </Text>
         ))}
         <Button label="Update my pantry" onPress={() => onApplyPantry(segment.actions)} />
+      </View>
+    );
+  }
+  if (segment.kind === 'shopping') {
+    return (
+      <View style={styles.card}>
+        <Text style={type.heading}>Shopping list changes</Text>
+        {segment.actions.map((action, i) => (
+          <Text key={i} style={type.body}>
+            {action.action === 'add' ? 'Add' : 'Remove'}: {action.text}
+          </Text>
+        ))}
+        <View style={styles.planButtons}>
+          <View style={styles.flex}>
+            <Button label="This week's list" onPress={() => onApplyShopping(segment.actions, 0)} />
+          </View>
+          <View style={styles.flex}>
+            <Button label="Next week's" variant="quiet" onPress={() => onApplyShopping(segment.actions, 1)} />
+          </View>
+        </View>
       </View>
     );
   }

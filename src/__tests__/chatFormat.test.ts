@@ -141,3 +141,22 @@ describe('pantry blocks', () => {
     expect(segments[1]).toEqual({ kind: 'pantry', actions: [{ action: 'add', text: '500 g rice' }] });
   });
 });
+
+describe('shopping blocks', () => {
+  it('become a shopping segment, separate from the pantry', () => {
+    const segments = parseReply('Sure.\n[[SHOPPING]]\nAdd | sunblock\nRemove | milk\n[[/SHOPPING]]');
+    expect(segments.map((s) => s.kind)).toEqual(['text', 'shopping']);
+    expect(segments[1]).toEqual({
+      kind: 'shopping',
+      actions: [
+        { action: 'add', text: 'sunblock' },
+        { action: 'remove', text: 'milk' },
+      ],
+    });
+  });
+
+  it('keeps a reply with both a pantry and a shopping block in order', () => {
+    const reply = '[[PANTRY]]\nAdd | rice\n[[/PANTRY]]\n[[SHOPPING]]\nAdd | eggs\n[[/SHOPPING]]';
+    expect(parseReply(reply).map((s) => s.kind)).toEqual(['pantry', 'shopping']);
+  });
+});

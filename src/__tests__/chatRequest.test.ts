@@ -89,4 +89,11 @@ describe('pantry instructions', () => {
     expect(prompt).toContain('[[PANTRY]]');
     expect(prompt).toContain('NEVER say you have added');
   });
+
+  it('describes the shopping list format and keeps it apart from the pantry', () => {
+    const prompt = buildSystemPrompt({ pantry: [], recipes: [], slots: [], household: 2 });
+    expect(prompt).toContain('[[SHOPPING]]');
+    expect(prompt).toContain('[[/SHOPPING]]');
+    expect(prompt).toContain('is NOT a pantry change');
+  });
 });

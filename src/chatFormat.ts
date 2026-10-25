@@ -21,7 +21,8 @@ export type Segment =
   | { kind: 'text'; text: string }
   | { kind: 'recipe'; recipe: RecipeInput }
   | { kind: 'plan'; entries: PlanEntry[] }
-  | { kind: 'pantry'; actions: PantryAction[] };
+  | { kind: 'pantry'; actions: PantryAction[] }
+  | { kind: 'shopping'; actions: PantryAction[] };
 
 /** Drops the markdown the model sometimes adds even though we ask for plain text. */
 const plain = (line: string) =>
@@ -101,7 +102,7 @@ export function parsePantryBlock(block: string): PantryAction[] {
   });
 }
 
-const BLOCK = /\[\[(RECIPE|PLAN|PANTRY)\]\]([\s\S]*?)(?:\[\[\/\1\]\]|$)/gi;
+const BLOCK = /\[\[(RECIPE|PLAN|PANTRY|SHOPPING)\]\]([\s\S]*?)(?:\[\[\/\1\]\]|$)/gi;
 
 /**
  * Splits a reply into text, recipes and plans. A block that can't be read is kept as plain text so
@@ -128,9 +129,11 @@ export function parseReply(reply: string): Segment[] {
       const recipe = parseRecipeBlock(match[2]);
       if (recipe) segments.push({ kind: 'recipe', recipe });
       else pushText(match[2]);
-    } else if (match[1].toUpperCase() === 'PANTRY') {
+    } else if (match[1].toUpperCase() === 'PANTRY' || match[1].toUpperCase() === 'SHOPPING') {
+      // Pantry and shopping changes share the "Add | item" / "Remove | item" format.
       const actions = parsePantryBlock(match[2]);
-      if (actions.length) segments.push({ kind: 'pantry', actions });
+      const kind = match[1].toUpperCase() === 'PANTRY' ? 'pantry' : 'shopping';
+      if (actions.length) segments.push({ kind, actions });
       else pushText(match[2]);
     } else {
       const entries = parsePlanBlock(match[2]);

@@ -1,4 +1,4 @@
-import { aisleFor } from './aisles';
+import { aisleFor, matchKey } from './aisles';
 import { formatIngredient, parseIngredient, toBaseUnit } from './ingredients';
 import { byName, itemKey, ShoppingItem } from './shopping';
 import { ListEntry, ShoppingEdits, WeekList } from './types';
@@ -116,4 +116,55 @@ export function setChecked(edits: ShoppingEdits, weekKey: string, key: string, c
 /** Drops edits for weeks that start before `keepFromWeekKey` (YYYY-MM-DD), so saved data doesn't grow forever. */
 export function pruneWeeks(edits: ShoppingEdits, keepFromWeekKey: string): ShoppingEdits {
   return Object.fromEntries(Object.entries(edits).filter(([weekKey]) => weekKey >= keepFromWeekKey));
+}
+
+/**
+ * Applies shopping list changes suggested by the assistant to one week's list. "Add" puts the item on as
+ * a hand-added line (or adds to one that is already there with the same unit). "Remove" takes every line
+ * with that name off the list, whether it came from your recipes or you added it, treating plurals alike.
+ * Lines that can't be read are ignored. `added` and `removed` count what actually changed.
+ */
+export function applyShoppingActions(
+  edits: ShoppingEdits,
+  weekKey: string,
+  rows: ListRow[],
+  actions: { action: 'add' | 'remove'; text: string }[],
+  makeId: () => string,
+): { edits: ShoppingEdits; added: number; removed: number } {
+  let result = edits;
+  let added = 0;
+  let removed = 0;
+  const removedKeys = new Set<string>();
+
+  for (const { action, text } of actions) {
+    const entry = entryFromText(text);
+    if (!entry) continue;
+    const key = matchKey(entry.name);
+
+    if (action === 'add') {
+      const existing = weekOf(result, weekKey).extras.find((e) => matchKey(e.name) === key && e.unit === entry.unit);
+      result = existing
+        ? editRow(result, weekKey, { key: `extra:${existing.id}`, kind: 'extra' }, { ...entry, quantity: existing.quantity + entry.quantity })
+        : addExtra(result, weekKey, entry, makeId());
+      added++;
+      continue;
+    }
+
+    const extras: ListRow[] = weekOf(result, weekKey).extras.map((e) => ({
+      name: e.name,
+      quantity: e.quantity,
+      unit: e.unit,
+      aisle: aisleFor(e.name),
+      key: `extra:${e.id}`,
+      kind: 'extra',
+      edited: false,
+    }));
+    const matches = [...rows, ...extras].filter((row) => matchKey(row.name) === key && !removedKeys.has(row.key));
+    for (const row of matches) {
+      result = removeRow(result, weekKey, row);
+      removedKeys.add(row.key);
+    }
+    if (matches.length) removed++;
+  }
+  return { edits: result, added, removed };
 }

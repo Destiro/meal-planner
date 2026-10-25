@@ -1,5 +1,6 @@
 import {
   addExtra,
+  applyShoppingActions,
   applyEdits,
   editRow,
   entryFromText,
@@ -102,5 +103,46 @@ describe('pruneWeeks', () => {
   it('drops weeks before the cut-off', () => {
     const edits = setChecked(setChecked(none, '2026-08-03', 'a', true), '2026-10-12', 'a', true);
     expect(Object.keys(pruneWeeks(edits, '2026-09-07'))).toEqual(['2026-10-12']);
+  });
+});
+
+describe('applyShoppingActions', () => {
+  let n = 0;
+  const makeId = () => `n${++n}`;
+  const rows = applyEdits(planned);
+
+  it('adds new items as hand-written lines and merges repeats of the same item and unit', () => {
+    let result = applyShoppingActions(none, WEEK, rows, [{ action: 'add', text: 'sunblock' }, { action: 'add', text: '2 bin bags' }], makeId);
+    expect(result.added).toBe(2);
+    expect(result.edits[WEEK].extras.map((e) => [e.name, e.quantity])).toEqual([['sunblock', 1], ['bin bags', 2]]);
+
+    result = applyShoppingActions(result.edits, WEEK, rows, [{ action: 'add', text: '3 bin bags' }], makeId);
+    expect(result.edits[WEEK].extras.map((e) => [e.name, e.quantity])).toEqual([['sunblock', 1], ['bin bags', 5]]);
+  });
+
+  it('removes planned and hand-added lines by name, treating plurals alike', () => {
+    const withExtra = addExtra(none, WEEK, { name: 'bin bag', quantity: 1, unit: '' }, 'x');
+    const result = applyShoppingActions(
+      withExtra,
+      WEEK,
+      rows,
+      [{ action: 'remove', text: 'Rice' }, { action: 'remove', text: 'bin bags' }, { action: 'remove', text: 'caviar' }],
+      makeId,
+    );
+    expect(result).toMatchObject({ added: 0, removed: 2 });
+    expect(result.edits[WEEK].extras).toEqual([]);
+    expect(applyEdits(planned, result.edits[WEEK]).map((r) => r.name)).toEqual(['tofu']);
+  });
+
+  it('can add an item and take it off again in the same go', () => {
+    const result = applyShoppingActions(none, WEEK, rows, [{ action: 'add', text: 'milk' }, { action: 'remove', text: 'milk' }], makeId);
+    expect(result).toMatchObject({ added: 1, removed: 1 });
+    expect(result.edits[WEEK].extras).toEqual([]);
+  });
+
+  it('ignores unreadable lines and does not change the input', () => {
+    const before = JSON.stringify(none);
+    expect(applyShoppingActions(none, WEEK, rows, [{ action: 'add', text: '  ' }], makeId)).toEqual({ edits: none, added: 0, removed: 0 });
+    expect(JSON.stringify(none)).toBe(before);
   });
 });
