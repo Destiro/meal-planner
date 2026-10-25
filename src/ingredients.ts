@@ -6,10 +6,10 @@ const UNIT_ALIASES: Record<string, string> = {
   kg: 'kg', kilogram: 'kg', kilograms: 'kg',
   ml: 'ml', millilitre: 'ml', millilitres: 'ml', milliliter: 'ml', milliliters: 'ml',
   l: 'l', litre: 'l', litres: 'l', liter: 'l', liters: 'l',
-  tsp: 'tsp', teaspoon: 'tsp', teaspoons: 'tsp',
-  tbsp: 'tbsp', tablespoon: 'tbsp', tablespoons: 'tbsp',
+  tsp: 'tsp', tsps: 'tsp', teaspoon: 'tsp', teaspoons: 'tsp',
+  tbsp: 'tbsp', tbsps: 'tbsp', tablespoon: 'tbsp', tablespoons: 'tbsp',
   cup: 'cup', cups: 'cup',
-  oz: 'oz', ounce: 'oz', ounces: 'oz',
+  oz: 'oz', ozs: 'oz', ounce: 'oz', ounces: 'oz',
   lb: 'lb', lbs: 'lb', pound: 'lb', pounds: 'lb',
 };
 

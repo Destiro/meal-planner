@@ -17,6 +17,8 @@ or press `a` to open an Android emulator.
 - `src/shopping.ts`, `ingredients.ts`, `aisles.ts` – shopping list maths (quantities, units, aisles)
 - `src/slots.ts`, `planUtils.ts`, `recipeFields.ts` – pure helpers for meal slots, week copying, tags/links
 - `src/pantry.ts`, `shoppingEdits.ts` – pantry subtraction and hand edits to shopping lists
+- `src/api.ts`, `explore.ts` – talks to the recipe Worker and turns online recipes into your own format
+- `worker/` – Cloudflare Worker that proxies Spoonacular so the API key stays off the phone (see `worker/README.md`)
 - `src/theme.ts` – colours, spacing, text styles
 - `src/screens/` – one file per screen
 - `src/components/` – shared UI pieces

@@ -10,24 +10,29 @@ import { RecipeInput } from '../store';
 import { colors, radius, spacing, type } from '../theme';
 import { Recipe } from '../types';
 import { Button } from './Button';
+import { PhotoFinderModal } from './PhotoFinderModal';
 
 interface Props {
   /** The recipe being edited, or null to create a new one. */
   recipe: Recipe | null;
+  /** Starting values for a new recipe, such as one borrowed from the online service. */
+  draft?: RecipeInput | null;
   onSave: (recipe: RecipeInput) => void;
   onDelete?: () => void;
   onClose: () => void;
 }
 
 /** Mount it when the form should open: its fields start from `recipe` each time. */
-export function RecipeFormModal({ recipe, onSave, onDelete, onClose }: Props) {
-  const [name, setName] = useState(recipe?.name ?? '');
-  const [servings, setServings] = useState(String(recipe?.servings ?? DEFAULT_SERVINGS));
-  const [ingredients, setIngredients] = useState(recipe?.ingredients.map(formatIngredient).join('\n') ?? '');
-  const [notes, setNotes] = useState(recipe?.notes ?? '');
-  const [link, setLink] = useState(recipe?.sourceUrl ?? '');
-  const [tags, setTags] = useState(recipe?.tags?.join(', ') ?? '');
-  const [photo, setPhoto] = useState(recipe?.photo);
+export function RecipeFormModal({ recipe, draft, onSave, onDelete, onClose }: Props) {
+  const start = recipe ?? draft ?? null;
+  const [name, setName] = useState(start?.name ?? '');
+  const [servings, setServings] = useState(String(start?.servings ?? DEFAULT_SERVINGS));
+  const [ingredients, setIngredients] = useState(start?.ingredients.map(formatIngredient).join('\n') ?? '');
+  const [notes, setNotes] = useState(start?.notes ?? '');
+  const [link, setLink] = useState(start?.sourceUrl ?? '');
+  const [tags, setTags] = useState(start?.tags?.join(', ') ?? '');
+  const [photo, setPhoto] = useState(start?.photo);
+  const [finding, setFinding] = useState(false);
 
   const linkInvalid = link.trim() !== '' && !normalizeUrl(link);
 
@@ -92,6 +97,8 @@ export function RecipeFormModal({ recipe, onSave, onDelete, onClose }: Props) {
               </View>
             ) : null}
           </View>
+          <Button label="Find a photo online" variant="quiet" onPress={() => setFinding(true)} disabled={!name.trim()} />
+          {!name.trim() && <Text style={type.small}>Give the recipe a name first, then we can look for matching photos.</Text>}
 
           <Text style={styles.label}>Name</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. Lentil soup" />
@@ -149,6 +156,16 @@ export function RecipeFormModal({ recipe, onSave, onDelete, onClose }: Props) {
           </View>
         </ScrollView>
       </SafeAreaView>
+      {finding && (
+        <PhotoFinderModal
+          query={name.trim()}
+          onClose={() => setFinding(false)}
+          onPick={(url) => {
+            setPhoto(url);
+            setFinding(false);
+          }}
+        />
+      )}
     </Modal>
   );
 }

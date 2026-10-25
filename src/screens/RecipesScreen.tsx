@@ -2,11 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { Alert, FlatList, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
+import { ExploreModal } from '../components/ExploreModal';
 import { RecipeFormModal } from '../components/RecipeFormModal';
 import { formatIngredient } from '../ingredients';
 import { deletePhoto } from '../photos';
 import { searchRecipes } from '../recipeFields';
-import { useStore } from '../store';
+import { RecipeInput, useStore } from '../store';
 import { colors, radius, spacing, type } from '../theme';
 import { Recipe } from '../types';
 
@@ -14,6 +15,9 @@ export default function RecipesScreen() {
   const { recipes, addRecipe, updateRecipe, deleteRecipe } = useStore();
   // undefined: form closed. null: adding a new recipe. Recipe: editing it.
   const [editing, setEditing] = useState<Recipe | null | undefined>(undefined);
+  // A recipe borrowed from Explore, shown in the Add Recipe form for you to review.
+  const [draft, setDraft] = useState<RecipeInput | null>(null);
+  const [exploring, setExploring] = useState(false);
   const [tag, setTag] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
@@ -43,7 +47,10 @@ export default function RecipesScreen() {
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
         <Text style={type.title}>Recipes</Text>
-        <Button label="Add recipe" onPress={() => setEditing(null)} />
+        <View style={styles.actions}>
+          <Button label="Explore" variant="quiet" onPress={() => setExploring(true)} />
+          <Button label="Add recipe" onPress={() => setEditing(null)} />
+        </View>
       </View>
 
       {recipes.length > 0 && (
@@ -108,16 +115,32 @@ export default function RecipesScreen() {
         )}
       />
 
+      {exploring && (
+        <ExploreModal
+          onClose={() => setExploring(false)}
+          onUse={(borrowed) => {
+            setExploring(false);
+            setDraft(borrowed);
+            setEditing(null);
+          }}
+        />
+      )}
+
       {editing !== undefined && (
         <RecipeFormModal
           // A fresh form each time, so one recipe's fields never leak into the next.
-          key={editing?.id ?? 'new'}
+          key={editing?.id ?? (draft ? `draft-${draft.name}` : 'new')}
           recipe={editing}
-          onClose={() => setEditing(undefined)}
+          draft={draft}
+          onClose={() => {
+            setEditing(undefined);
+            setDraft(null);
+          }}
           onSave={(input) => {
             if (editing) updateRecipe(editing.id, input);
             else addRecipe(input);
             setEditing(undefined);
+            setDraft(null);
           }}
           onDelete={editing ? () => confirmDelete(editing) : undefined}
         />
@@ -129,6 +152,7 @@ export default function RecipesScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg },
+  actions: { flexDirection: 'row', gap: spacing.sm },
   search: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   searchInput: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, padding: spacing.md, fontSize: 15 },
   chips: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },

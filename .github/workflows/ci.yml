@@ -62,3 +62,20 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx expo-doctor
+
+  worker-typecheck:
+    name: Worker typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
