@@ -36,6 +36,7 @@ interface StoreValue {
   setMeal: (dateKey: string, meal: MealType, recipeId: string | null) => void;
   copyWeekPlan: (from: Date, to: Date) => void;
   setHousehold: (people: number) => void;
+  setGroupByAisle: (on: boolean) => void;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -120,9 +121,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setSettings((prev) => ({ ...prev, household: Math.min(20, Math.max(1, Math.round(people))) }));
   }, []);
 
+  const setGroupByAisle = useCallback((on: boolean) => {
+    setSettings((prev) => ({ ...prev, groupByAisle: on }));
+  }, []);
+
   const value = useMemo(
-    () => ({ ready, recipes, plan, settings, addRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold }),
-    [ready, recipes, plan, settings, addRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold],
+    () => ({ ready, recipes, plan, settings, addRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle }),
+    [ready, recipes, plan, settings, addRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

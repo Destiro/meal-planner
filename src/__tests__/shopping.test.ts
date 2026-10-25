@@ -1,4 +1,4 @@
-import { buildShoppingList, formatItemAmount, formatShoppingText } from '../shopping';
+import { buildShoppingList, formatItemAmount, formatShoppingText, groupByAisle, ShoppingItem } from '../shopping';
 import { MealPlan, Recipe } from '../types';
 
 const recipes: Recipe[] = [
@@ -8,24 +8,40 @@ const recipes: Recipe[] = [
 const monday = new Date(2026, 9, 12);
 const meals: MealPlan = { '2026-10-12': { lunch: 'a' }, '2026-10-14': { dinner: 'b' } };
 
+const item = (name: string, quantity: number, unit = '', aisle: ShoppingItem['aisle'] = 'Other'): ShoppingItem => ({
+  name,
+  quantity,
+  unit,
+  aisle,
+});
+
 describe('buildShoppingList', () => {
   it('adds up amounts across meals, ignoring case and converting kg to g', () => {
     expect(buildShoppingList(recipes, meals, monday, 2)).toEqual([
-      { name: 'egg', quantity: 2, unit: '' },
-      { name: 'rice', quantity: 700, unit: 'g' },
-      { name: 'tofu', quantity: 1, unit: '' },
+      item('egg', 2, '', 'Dairy & chilled'),
+      item('rice', 700, 'g', 'Pantry'),
+      item('tofu', 1, '', 'Dairy & chilled'),
+    ]);
+  });
+
+  it('treats singular and plural names as the same ingredient', () => {
+    const veg: Recipe[] = [
+      { id: 'v', name: 'V', servings: 1, ingredients: [{ name: 'tomato', quantity: 2 }, { name: 'Tomatoes', quantity: 3 }] },
+    ];
+    expect(buildShoppingList(veg, { '2026-10-12': { lunch: 'v' } }, monday, 1)).toEqual([
+      item('tomato', 5, '', 'Produce'),
     ]);
   });
 
   it('scales quantities to the household size but leaves unmeasured items alone', () => {
     const list = buildShoppingList(recipes, { '2026-10-12': { lunch: 'a' } }, monday, 4);
-    expect(list).toContainEqual({ name: 'rice', quantity: 400, unit: 'g' });
-    expect(list).toContainEqual({ name: 'tofu', quantity: 1, unit: '' });
+    expect(list).toContainEqual(item('rice', 400, 'g', 'Pantry'));
+    expect(list).toContainEqual(item('tofu', 1, '', 'Dairy & chilled'));
   });
 
   it('counts an ingredient without a quantity once per meal', () => {
     const plan: MealPlan = { '2026-10-12': { lunch: 'a', dinner: 'a' } };
-    expect(buildShoppingList(recipes, plan, monday, 2)).toContainEqual({ name: 'tofu', quantity: 2, unit: '' });
+    expect(buildShoppingList(recipes, plan, monday, 2)).toContainEqual(item('tofu', 2, '', 'Dairy & chilled'));
   });
 
   it('keeps different units of the same ingredient apart', () => {
@@ -53,28 +69,34 @@ describe('buildShoppingList', () => {
   });
 });
 
+describe('groupByAisle', () => {
+  it('orders aisles as you walk the shop, sorts within them and skips empty ones', () => {
+    const sections = groupByAisle([
+      item('rice', 1, '', 'Pantry'),
+      item('tomato', 1, '', 'Produce'),
+      item('apple', 1, '', 'Produce'),
+    ]);
+    expect(sections.map((s) => s.aisle)).toEqual(['Produce', 'Pantry']);
+    expect(sections[0].data.map((i) => i.name)).toEqual(['apple', 'tomato']);
+  });
+});
+
 describe('formatItemAmount', () => {
   it('shows large weights and volumes in kg and l', () => {
-    expect(formatItemAmount({ name: 'rice', quantity: 1500, unit: 'g' })).toBe('1.5 kg');
-    expect(formatItemAmount({ name: 'milk', quantity: 2000, unit: 'ml' })).toBe('2 l');
+    expect(formatItemAmount(item('rice', 1500, 'g'))).toBe('1.5 kg');
+    expect(formatItemAmount(item('milk', 2000, 'ml'))).toBe('2 l');
   });
 
   it('shows counts, and nothing for a single unmeasured item', () => {
-    expect(formatItemAmount({ name: 'egg', quantity: 6, unit: '' })).toBe('×6');
-    expect(formatItemAmount({ name: 'tofu', quantity: 1, unit: '' })).toBe('');
+    expect(formatItemAmount(item('egg', 6))).toBe('×6');
+    expect(formatItemAmount(item('tofu', 1))).toBe('');
   });
 });
 
 describe('formatShoppingText', () => {
   it('writes a title followed by one bullet per item', () => {
-    expect(
-      formatShoppingText(
-        [
-          { name: 'rice', quantity: 700, unit: 'g' },
-          { name: 'tofu', quantity: 1, unit: '' },
-        ],
-        'Shopping list',
-      ),
-    ).toBe('Shopping list\n• rice 700 g\n• tofu');
+    expect(formatShoppingText([item('rice', 700, 'g'), item('tofu', 1)], 'Shopping list')).toBe(
+      'Shopping list\n• rice 700 g\n• tofu',
+    );
   });
 });

@@ -20,6 +20,8 @@ export interface Recipe {
 export interface Settings {
   /** How many people you cook for. Shopping quantities scale to this. */
   household: number;
+  /** Show the shopping list split into supermarket aisles. */
+  groupByAisle: boolean;
 }
 
 /** Maps a meal slot to a recipe id. */

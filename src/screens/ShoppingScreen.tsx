@@ -1,15 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Pressable, SectionList, Share, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
 import { addDays, formatRange, startOfWeek, toKey } from '../dates';
-import { buildShoppingList, formatItemAmount, formatShoppingText, itemKey } from '../shopping';
+import { AisleSection, buildShoppingList, formatItemAmount, formatShoppingText, groupByAisle, itemKey } from '../shopping';
 import { useStore } from '../store';
 import { colors, radius, spacing, type } from '../theme';
 
 /** Builds a shopping list from the planned meals of a chosen week. */
 export default function ShoppingScreen() {
-  const { recipes, plan, settings, setHousehold } = useStore();
+  const { recipes, plan, settings, setHousehold, setGroupByAisle } = useStore();
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
 
@@ -21,6 +21,11 @@ export default function ShoppingScreen() {
   const items = useMemo(
     () => buildShoppingList(recipes, plan, weekStart, settings.household),
     [recipes, plan, weekStart, settings.household],
+  );
+
+  const sections = useMemo<{ aisle: AisleSection['aisle'] | null; data: AisleSection['data'] }[]>(
+    () => (settings.groupByAisle ? groupByAisle(items) : [{ aisle: null, data: items }]),
+    [items, settings.groupByAisle],
   );
 
   // Ticks are remembered per week so moving between weeks doesn't mix them up.
@@ -82,16 +87,32 @@ export default function ShoppingScreen() {
         </View>
       </View>
 
+      <View style={styles.household}>
+        <Text style={type.body}>Group by aisle</Text>
+        <Switch
+          value={settings.groupByAisle}
+          onValueChange={setGroupByAisle}
+          trackColor={{ true: colors.accent }}
+          accessibilityLabel="Group by aisle"
+        />
+      </View>
+
       {items.length > 0 && (
         <View style={styles.shareRow}>
           <Button label="Share list" variant="quiet" onPress={share} disabled={remaining.length === 0} />
         </View>
       )}
-      <FlatList
-        data={items}
+      <SectionList
+        sections={sections}
         keyExtractor={itemKey}
         contentContainerStyle={styles.list}
+        stickySectionHeadersEnabled={false}
+        renderSectionHeader={({ section }) =>
+          section.aisle ? <Text style={styles.aisle}>{section.aisle}</Text> : null
+        }
         ListEmptyComponent={<Text style={type.small}>Plan some meals and their ingredients will show up here.</Text>}
+        SectionSeparatorComponent={() => <View style={{ height: spacing.xs }} />}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         renderItem={({ item }) => {
           const done = !!checked[tickKey(itemKey(item))];
           const amount = formatItemAmount(item);
@@ -125,7 +146,8 @@ const styles = StyleSheet.create({
   stepText: { fontSize: 22, color: colors.accent, fontWeight: '600', lineHeight: 26 },
   people: { minWidth: 24, textAlign: 'center' },
   shareRow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  list: { padding: spacing.lg, paddingTop: 0, gap: spacing.sm },
+  aisle: { fontSize: 13, fontWeight: '700', color: colors.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, paddingTop: spacing.md },
+  list: { padding: spacing.lg, paddingTop: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line },
   box: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.accent },
   boxDone: { backgroundColor: colors.accent },

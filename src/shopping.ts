@@ -1,22 +1,28 @@
+import { Aisle, AISLES, aisleFor, matchKey } from './aisles';
 import { addDays, toKey } from './dates';
 import { formatAmount, toBaseUnit } from './ingredients';
 import { MealPlan, Recipe } from './types';
 
 export interface ShoppingItem {
+  /** As first written in a recipe, e.g. "tomatoes". */
   name: string;
   /** Total to buy. For items without a unit this is a count, e.g. 3 eggs. */
   quantity: number;
   /** '' for plain counts. */
   unit: string;
+  aisle: Aisle;
 }
 
 /** Stable id for an item: the same ingredient in different units is listed separately. */
-export const itemKey = (item: ShoppingItem) => `${item.name}|${item.unit}`;
+export const itemKey = (item: ShoppingItem) => `${matchKey(item.name)}|${item.unit}`;
+
+const byName = (a: ShoppingItem, b: ShoppingItem) => a.name.localeCompare(b.name) || a.unit.localeCompare(b.unit);
 
 /**
- * Ingredients for every meal planned in the 7 days starting at `weekStart`, merged by name and unit.
- * Quantities are scaled from each recipe's servings to `household` people. An ingredient with no
- * quantity (like "salt") counts as one each time it appears and isn't scaled.
+ * Ingredients for every meal planned in the 7 days starting at `weekStart`, merged by name and unit
+ * ("tomato" and "Tomatoes" are one item). Quantities are scaled from each recipe's servings to
+ * `household` people. An ingredient with no quantity (like "salt") counts as one each time it
+ * appears and isn't scaled. Sorted by name.
  */
 export function buildShoppingList(
   recipes: Recipe[],
@@ -38,14 +44,26 @@ export function buildShoppingList(
           ing.quantity === undefined
             ? { quantity: 1, unit: '' }
             : toBaseUnit(ing.quantity * scale, ing.unit ?? '');
-        const item = { name, quantity, unit };
+        const item: ShoppingItem = { name, quantity, unit, aisle: aisleFor(name) };
         const existing = totals.get(itemKey(item));
         if (existing) existing.quantity += quantity;
         else totals.set(itemKey(item), item);
       }
     }
   }
-  return [...totals.values()].sort((a, b) => a.name.localeCompare(b.name) || a.unit.localeCompare(b.unit));
+  return [...totals.values()].sort(byName);
+}
+
+export interface AisleSection {
+  aisle: Aisle;
+  data: ShoppingItem[];
+}
+
+/** Splits items into aisles (in walking order), leaving out aisles with nothing in them. */
+export function groupByAisle(items: ShoppingItem[]): AisleSection[] {
+  return AISLES.map((aisle) => ({ aisle, data: items.filter((i) => i.aisle === aisle).sort(byName) })).filter(
+    (section) => section.data.length > 0,
+  );
 }
 
 /** "200 g", "3 cups", "×2", or '' when there is nothing worth showing. */

@@ -4,7 +4,7 @@ import { MealPlan, Recipe, Settings } from './types';
 /** Bump when the saved shape changes, and teach `migrate` how to upgrade the old one. */
 export const DATA_VERSION = 2;
 
-export const DEFAULT_SETTINGS: Settings = { household: 2 };
+export const DEFAULT_SETTINGS: Settings = { household: 2, groupByAisle: true };
 export const DEFAULT_SERVINGS = 2;
 
 export interface StoredData {

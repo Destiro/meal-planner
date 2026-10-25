@@ -12,7 +12,7 @@ describe('migrate', () => {
         { id: 'r', name: 'Oats', servings: 2, ingredients: [{ name: 'oats', quantity: 200, unit: 'g' }, { name: 'milk' }] },
       ],
       plan: { '2026-10-12': { lunch: 'r' } },
-      settings: { household: 2 },
+      settings: { household: 2, groupByAisle: true },
     });
   });
 
@@ -21,7 +21,7 @@ describe('migrate', () => {
       version: DATA_VERSION,
       recipes: [{ id: 'r', name: 'X', servings: 4, ingredients: [{ name: 'egg', quantity: 2 }] }],
       plan: {},
-      settings: { household: 3 },
+      settings: { household: 3, groupByAisle: false },
     };
     expect(migrate(current)).toEqual(current);
   });
