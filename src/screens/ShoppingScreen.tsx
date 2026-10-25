@@ -5,11 +5,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
 import { EditItemModal } from '../components/EditItemModal';
 import { addDays, formatRange, startOfWeek, toKey } from '../dates';
-import { addToPantry, applyPantry } from '../pantry';
-import { AisleSection, buildShoppingList, formatItemAmount, formatShoppingText, groupByAisle } from '../shopping';
+import { addToPantry } from '../pantry';
+import { AisleSection, formatItemAmount, formatShoppingText, groupByAisle } from '../shopping';
 import {
   addExtra,
-  applyEdits,
   editRow,
   EMPTY_WEEK,
   entryFromText,
@@ -21,6 +20,7 @@ import {
   restoreRemoved,
   setChecked,
 } from '../shoppingEdits';
+import { shoppingRows } from '../shoppingList';
 import { newId, useStore } from '../store';
 import { colors, radius, spacing, type } from '../theme';
 
@@ -37,22 +37,12 @@ export default function ShoppingScreen() {
   const label =
     weekKey === thisWeekKey ? 'This week' : weekKey === toKey(addDays(startOfWeek(new Date()), 7)) ? 'Next week' : 'Week of';
 
-  const planned = useMemo(
-    () =>
-      buildShoppingList(
-        recipes,
-        plan,
-        weekStart,
-        settings.household,
-        settings.mealSlots.map((slot) => slot.id),
-      ),
-    [recipes, plan, weekStart, settings.household, settings.mealSlots],
+  // What the meals need, minus what you already have, with your hand edits applied on top.
+  const { rows, needed, covered } = useMemo(
+    () => shoppingRows({ recipes, plan, settings, pantry, edits: shoppingEdits }, weekKey, weekStart),
+    [recipes, plan, settings, pantry, shoppingEdits, weekKey, weekStart],
   );
-
-  // What you already have comes off first, then your hand edits are applied on top.
-  const { items: needed, covered } = useMemo(() => applyPantry(planned, pantry), [planned, pantry]);
   const week = shoppingEdits[weekKey] ?? EMPTY_WEEK;
-  const rows = useMemo(() => applyEdits(needed, week), [needed, week]);
   const removed = removedCount(needed, week);
 
   const sections = useMemo<{ aisle: AisleSection['aisle'] | null; data: ListRow[] }[]>(
