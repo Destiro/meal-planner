@@ -16,7 +16,7 @@ export interface ShoppingItem {
 /** Stable id for an item: the same ingredient in different units is listed separately. */
 export const itemKey = (item: ShoppingItem) => `${matchKey(item.name)}|${item.unit}`;
 
-const byName = (a: ShoppingItem, b: ShoppingItem) => a.name.localeCompare(b.name) || a.unit.localeCompare(b.unit);
+export const byName = (a: ShoppingItem, b: ShoppingItem) => a.name.localeCompare(b.name) || a.unit.localeCompare(b.unit);
 
 /**
  * Ingredients for every meal planned in the 7 days starting at `weekStart`, merged by name and unit
@@ -56,13 +56,13 @@ export function buildShoppingList(
   return [...totals.values()].sort(byName);
 }
 
-export interface AisleSection {
+export interface AisleSection<T extends ShoppingItem = ShoppingItem> {
   aisle: Aisle;
-  data: ShoppingItem[];
+  data: T[];
 }
 
 /** Splits items into aisles (in walking order), leaving out aisles with nothing in them. */
-export function groupByAisle(items: ShoppingItem[]): AisleSection[] {
+export function groupByAisle<T extends ShoppingItem>(items: T[]): AisleSection<T>[] {
   return AISLES.map((aisle) => ({ aisle, data: items.filter((i) => i.aisle === aisle).sort(byName) })).filter(
     (section) => section.data.length > 0,
   );

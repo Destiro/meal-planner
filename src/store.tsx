@@ -3,13 +3,19 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { parseIngredient } from './ingredients';
 import { DEFAULT_SERVINGS, DEFAULT_SETTINGS, DATA_VERSION, migrate } from './migrate';
 import { copyWeek } from './planUtils';
-import { MealPlan, MealSlot, MealType, Recipe, Settings } from './types';
+import { addDays, startOfWeek, toKey } from './dates';
+import { pruneWeeks } from './shoppingEdits';
+import { MealPlan, MealSlot, MealType, Recipe, Settings, ShoppingEdits } from './types';
 
 // The key predates versioning, so it keeps its "v1" name; the version lives inside the data.
 const STORAGE_KEY = 'mealplanner:v1';
 const BACKUP_KEY = 'mealplanner:backup';
 
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+export const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const uid = newId;
+
+/** Hand edits to shopping lists are kept for the last few weeks, then dropped. */
+const KEEP_EDIT_WEEKS = 5;
 
 const seed = (id: string, name: string, ingredients: string[]): Recipe => ({
   id,
@@ -31,6 +37,9 @@ interface StoreValue {
   recipes: Recipe[];
   plan: MealPlan;
   settings: Settings;
+  shoppingEdits: ShoppingEdits;
+  /** Change the hand edits using one of the reducers in shoppingEdits.ts. */
+  updateShoppingEdits: (change: (edits: ShoppingEdits) => ShoppingEdits) => void;
   addRecipe: (recipe: RecipeInput) => void;
   updateRecipe: (id: string, recipe: RecipeInput) => void;
   deleteRecipe: (id: string) => void;
@@ -48,6 +57,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [plan, setPlan] = useState<MealPlan>({});
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [shoppingEdits, setShoppingEdits] = useState<ShoppingEdits>({});
   // Turned off if we couldn't read what's on the phone, so we never overwrite it with defaults.
   const canSave = useRef(true);
 
@@ -68,6 +78,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           setRecipes(data.recipes);
           setPlan(data.plan);
           setSettings(data.settings);
+          setShoppingEdits(pruneWeeks(data.shoppingEdits, toKey(addDays(startOfWeek(new Date()), -7 * KEEP_EDIT_WEEKS))));
         } catch (e) {
           // Unreadable or from a newer app: keep a copy aside instead of losing it, then start fresh.
           console.warn('Saved data could not be understood', e);
@@ -84,10 +95,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Save whenever data changes (after the initial load).
   useEffect(() => {
     if (!ready || !canSave.current) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ version: DATA_VERSION, recipes, plan, settings })).catch((e) =>
-      console.warn('Could not save data', e),
-    );
-  }, [ready, recipes, plan, settings]);
+    AsyncStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ version: DATA_VERSION, recipes, plan, settings, shoppingEdits }),
+    ).catch((e) => console.warn('Could not save data', e));
+  }, [ready, recipes, plan, settings, shoppingEdits]);
+
+  const updateShoppingEdits = useCallback((change: (edits: ShoppingEdits) => ShoppingEdits) => {
+    setShoppingEdits(change);
+  }, []);
 
   const addRecipe = useCallback((recipe: RecipeInput) => {
     setRecipes((prev) => [...prev, { id: uid(), ...recipe }]);
@@ -136,8 +152,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ ready, recipes, plan, settings, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots }),
-    [ready, recipes, plan, settings, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots],
+    () => ({ ready, recipes, plan, settings, shoppingEdits, updateShoppingEdits, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots }),
+    [ready, recipes, plan, settings, shoppingEdits, updateShoppingEdits, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

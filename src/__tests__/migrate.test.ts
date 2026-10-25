@@ -14,7 +14,15 @@ describe('migrate', () => {
       ],
       plan: { '2026-10-12': { lunch: 'r' } },
       settings: { household: 2, groupByAisle: true, mealSlots: DEFAULT_SLOTS },
+      shoppingEdits: {},
     });
+  });
+
+  it('upgrades v2 data by adding empty shopping edits', () => {
+    const v2 = { version: 2, recipes: [], plan: {}, settings: { household: 3, groupByAisle: true, mealSlots: DEFAULT_SLOTS } };
+    const result = migrate(v2);
+    expect(result.shoppingEdits).toEqual({});
+    expect(result.settings.household).toBe(3);
   });
 
   it('leaves current data alone', () => {
@@ -23,6 +31,7 @@ describe('migrate', () => {
       recipes: [{ id: 'r', name: 'X', servings: 4, ingredients: [{ name: 'egg', quantity: 2 }] }],
       plan: {},
       settings: { household: 3, groupByAisle: false, mealSlots: [{ id: 'snack-1', label: 'Snack' }] },
+      shoppingEdits: { '2026-10-12': { extras: [], overrides: { 'rice|g': null }, checked: { 'tofu|': true } } },
     };
     expect(migrate(current)).toEqual(current);
   });
