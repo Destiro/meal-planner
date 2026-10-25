@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
+import { formatIngredient, parseIngredient } from '../ingredients';
+import { DEFAULT_SERVINGS } from '../migrate';
 import { useStore } from '../store';
 import { colors, radius, spacing, type } from '../theme';
 
@@ -10,16 +12,22 @@ export default function RecipesScreen() {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const [ingredients, setIngredients] = useState('');
+  const [servings, setServings] = useState(String(DEFAULT_SERVINGS));
 
   const close = () => {
     setAdding(false);
     setName('');
     setIngredients('');
+    setServings(String(DEFAULT_SERVINGS));
   };
 
   const save = () => {
-    const list = ingredients.split('\n').map((s) => s.trim()).filter(Boolean);
-    addRecipe(name.trim(), list);
+    const list = ingredients
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map(parseIngredient);
+    addRecipe({ name: name.trim(), servings: Math.max(1, Math.round(Number(servings)) || DEFAULT_SERVINGS), ingredients: list });
     close();
   };
 
@@ -44,7 +52,7 @@ export default function RecipesScreen() {
         renderItem={({ item }) => (
           <Pressable style={styles.card} onLongPress={() => confirmDelete(item.id, item.name)}>
             <Text style={type.heading}>{item.name}</Text>
-            <Text style={type.small}>{item.ingredients.join(', ') || 'No ingredients listed'}</Text>
+            <Text style={type.small}>{item.ingredients.map(formatIngredient).join(', ') || 'No ingredients listed'}</Text>
           </Pressable>
         )}
       />
@@ -56,7 +64,9 @@ export default function RecipesScreen() {
             <Text style={type.title}>New recipe</Text>
             <Text style={styles.label}>Name</Text>
             <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. Lentil soup" />
-            <Text style={styles.label}>Ingredients (one per line)</Text>
+            <Text style={styles.label}>Serves (people)</Text>
+            <TextInput style={styles.input} value={servings} onChangeText={setServings} keyboardType="number-pad" />
+            <Text style={styles.label}>Ingredients (one per line, e.g. 200g rice or 2 eggs)</Text>
             <TextInput
               style={[styles.input, { height: 160, textAlignVertical: 'top' }]}
               value={ingredients}
