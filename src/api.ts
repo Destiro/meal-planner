@@ -64,6 +64,8 @@ export interface ChatContext {
   recipes: string[];
   slots: string[];
   household: number;
+  /** What is on the shopping list this week and next, including items you added yourself. */
+  shopping: { thisWeek: string[]; nextWeek: string[] };
 }
 
 /** Sends the conversation to the assistant and returns its reply text. */

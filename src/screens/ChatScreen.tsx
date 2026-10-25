@@ -17,12 +17,12 @@ import { Button } from '../components/Button';
 import { RecipeFormModal } from '../components/RecipeFormModal';
 import { RecipePreviewModal } from '../components/RecipePreviewModal';
 import { loadChat, saveChat, StoredMessage } from '../chatHistory';
-import { PantryAction, parseReply, PlanEntry, planToMeals, Segment } from '../chatFormat';
+import { PantryAction, parseReply, PlanEntry, planToMeals, Segment, ShoppingAction } from '../chatFormat';
 import { formatDuration } from '../audio';
 import { addDays, startOfWeek, toKey } from '../dates';
 import { formatIngredient } from '../ingredients';
 import { applyPantryActions, pantryToText } from '../pantry';
-import { applyShoppingActions } from '../shoppingEdits';
+import { applyShoppingActions, EMPTY_WEEK, entryToText } from '../shoppingEdits';
 import { shoppingRows } from '../shoppingList';
 import { newId, RecipeInput, useStore } from '../store';
 import { useVoiceInput } from '../useVoiceInput';
@@ -58,15 +58,25 @@ export default function ChatScreen() {
     if (loaded) saveChat(messages);
   }, [loaded, messages]);
 
-  const context = useMemo(
-    () => ({
+  // What the assistant is told about you. The shopping lists are the real ones, including items you typed in
+  // yourself, with bought (ticked) items marked.
+  const context = useMemo(() => {
+    const listFor = (weekOffset: 0 | 1) => {
+      const weekStart = addDays(startOfWeek(new Date()), 7 * weekOffset);
+      const weekKey = toKey(weekStart);
+      const checked = (shoppingEdits[weekKey] ?? EMPTY_WEEK).checked;
+      return shoppingRows({ recipes, plan, settings, pantry, edits: shoppingEdits }, weekKey, weekStart).rows.map(
+        (row) => `${entryToText(row)}${checked[row.key] ? ' (ticked off)' : ''}`,
+      );
+    };
+    return {
       pantry: pantry.map(pantryToText),
       recipes: recipes.map((r) => r.name),
       slots: settings.mealSlots.map((s) => s.label),
       household: settings.household,
-    }),
-    [pantry, recipes, settings.mealSlots, settings.household],
-  );
+      shopping: { thisWeek: listFor(0), nextWeek: listFor(1) },
+    };
+  }, [pantry, recipes, plan, settings, shoppingEdits]);
 
   /** Sends `history` (which already ends with the person's message) and adds the assistant's reply. */
   const ask = async (history: StoredMessage[]) => {
@@ -115,7 +125,7 @@ export default function ChatScreen() {
   };
 
   // Applies the assistant's suggested shopping list changes to this week's list or next week's.
-  const applyShopping = (actions: PantryAction[], weekOffset: 0 | 1) => {
+  const applyShopping = (actions: ShoppingAction[], weekOffset: 0 | 1) => {
     const weekStart = addDays(startOfWeek(new Date()), 7 * weekOffset);
     const weekKey = toKey(weekStart);
     const { rows } = shoppingRows({ recipes, plan, settings, pantry, edits: shoppingEdits }, weekKey, weekStart);
@@ -282,7 +292,7 @@ function AssistantMessage({
   onSaveRecipe: (recipe: RecipeInput) => void;
   onAddPlan: (entries: PlanEntry[], weekOffset: 0 | 1) => void;
   onApplyPantry: (actions: PantryAction[]) => void;
-  onApplyShopping: (actions: PantryAction[], weekOffset: 0 | 1) => void;
+  onApplyShopping: (actions: ShoppingAction[], weekOffset: 0 | 1) => void;
 }) {
   const segments = useMemo(() => parseReply(content), [content]);
   return (
@@ -315,7 +325,7 @@ function SegmentView({
   onSaveRecipe: (recipe: RecipeInput) => void;
   onAddPlan: (entries: PlanEntry[], weekOffset: 0 | 1) => void;
   onApplyPantry: (actions: PantryAction[]) => void;
-  onApplyShopping: (actions: PantryAction[], weekOffset: 0 | 1) => void;
+  onApplyShopping: (actions: ShoppingAction[], weekOffset: 0 | 1) => void;
 }) {
   if (segment.kind === 'text') {
     return (
@@ -363,7 +373,7 @@ function SegmentView({
         <Text style={type.heading}>Shopping list changes</Text>
         {segment.actions.map((action, i) => (
           <Text key={i} style={type.body}>
-            {action.action === 'add' ? 'Add' : 'Remove'}: {action.text}
+            {action.action === 'clear' ? 'Remove everything from the list' : `${action.action === 'add' ? 'Add' : 'Remove'}: ${action.text}`}
           </Text>
         ))}
         <View style={styles.planButtons}>

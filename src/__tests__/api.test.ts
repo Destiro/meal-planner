@@ -50,7 +50,7 @@ describe('randomOnline', () => {
 });
 
 describe('chatOnline', () => {
-  const context = { pantry: ['rice'], recipes: ['Soup'], slots: ['Dinner'], household: 2 };
+  const context = { pantry: ['rice'], recipes: ['Soup'], slots: ['Dinner'], household: 2, shopping: { thisWeek: ['milk'], nextWeek: [] } };
 
   it('posts the conversation and context and returns the reply', async () => {
     fetchMock.mockReturnValue(reply(200, { reply: 'Try a stir fry.' }));

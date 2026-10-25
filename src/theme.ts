@@ -8,6 +8,8 @@ export const colors = {
   accent: '#2E7D4F',
   accentSoft: '#E1F0E6',
   danger: '#B3361F',
+  // Shopping lines you added yourself, which never scale with Cooking for. Lines from recipes use the accent.
+  own: '#9A6700',
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };

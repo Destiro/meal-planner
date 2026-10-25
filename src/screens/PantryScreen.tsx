@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
 import { EditItemModal } from '../components/EditItemModal';
@@ -24,6 +24,16 @@ export default function PantryScreen() {
     setNewItem('');
   };
 
+  const clearPantry = () =>
+    Alert.alert(
+      'Clear your pantry?',
+      `This removes all ${items.length} ${items.length === 1 ? 'item' : 'items'}. Anything on your shopping list that your pantry was covering will appear on the list again.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Clear pantry', style: 'destructive', onPress: () => updatePantry(() => []) },
+      ],
+    );
+
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
@@ -42,6 +52,12 @@ export default function PantryScreen() {
         />
         <Button label="Add" onPress={add} disabled={!newItem.trim()} />
       </View>
+
+      {items.length > 0 && (
+        <View style={styles.clearRow}>
+          <Button label="Clear pantry" variant="quiet" onPress={clearPantry} />
+        </View>
+      )}
 
       <FlatList
         data={items}
@@ -103,6 +119,7 @@ const styles = StyleSheet.create({
   header: { padding: spacing.lg, gap: spacing.xs },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   input: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, padding: spacing.md, fontSize: 15 },
+  clearRow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   list: { padding: spacing.lg, paddingTop: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line },
 });

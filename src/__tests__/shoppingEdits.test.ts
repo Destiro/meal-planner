@@ -1,6 +1,7 @@
 import {
   addExtra,
   applyShoppingActions,
+  clearWeek,
   applyEdits,
   editRow,
   entryFromText,
@@ -10,6 +11,8 @@ import {
   removeRow,
   resetRow,
   restoreRemoved,
+  rowCaption,
+  rowOrigin,
   setChecked,
 } from '../shoppingEdits';
 import { itemKey, ShoppingItem } from '../shopping';
@@ -255,5 +258,77 @@ describe('applyShoppingActions: adding more of something already there', () => {
       makeId,
     );
     expect(quantities(result.edits)).toEqual([['flour', 2, 'bag']]);
+  });
+});
+
+describe('clearing a week', () => {
+  let n = 0;
+  const makeId = () => `c${++n}`;
+  const rows = () => applyEdits(planned);
+
+  it('clearWeek deletes hand-added lines, hides planned ones and drops their ticks', () => {
+    let edits = addExtra(none, WEEK, { name: 'sunblock', quantity: 1, unit: '' }, 's');
+    edits = setChecked(edits, WEEK, 'extra:s', true);
+    const all = applyEdits(planned, edits[WEEK]);
+    const cleared = clearWeek(edits, WEEK, all);
+    expect(applyEdits(planned, cleared[WEEK])).toEqual([]);
+    expect(cleared[WEEK].extras).toEqual([]);
+    expect(cleared[WEEK].checked).toEqual({});
+    expect(removedCount(planned, cleared[WEEK])).toBe(2);
+  });
+
+  it('planned lines can be brought back with restoreRemoved, hand-added ones cannot', () => {
+    const edits = addExtra(none, WEEK, { name: 'sunblock', quantity: 1, unit: '' }, 's');
+    const cleared = clearWeek(edits, WEEK, applyEdits(planned, edits[WEEK]));
+    expect(applyEdits(planned, restoreRemoved(cleared, WEEK)[WEEK]).map((r) => r.name)).toEqual(['rice', 'tofu']);
+  });
+
+  it('clearing an empty list does nothing', () => {
+    expect(clearWeek(none, WEEK, [])).toEqual(none);
+  });
+
+  it('a Clear action from the assistant empties the list, counting every line', () => {
+    const edits = addExtra(none, WEEK, { name: 'sunblock', quantity: 1, unit: '' }, 's');
+    const result = applyShoppingActions(edits, WEEK, applyEdits(planned, edits[WEEK]), [{ action: 'clear', text: '' }], makeId);
+    expect(result).toMatchObject({ added: 0, removed: 3, reduced: 0 });
+    expect(applyEdits(planned, result.edits[WEEK])).toEqual([]);
+  });
+
+  it('Clear also takes off things added earlier in the same reply, and later adds still work', () => {
+    const result = applyShoppingActions(
+      none,
+      WEEK,
+      rows(),
+      [{ action: 'add', text: 'milk' }, { action: 'clear', text: '' }, { action: 'add', text: 'bread' }],
+      makeId,
+    );
+    expect(applyEdits(planned, result.edits[WEEK]).map((r) => r.name)).toEqual(['bread']);
+  });
+});
+
+describe('rowOrigin and rowCaption', () => {
+  const line = (extra: object = {}) => ({ kind: 'planned' as const, edited: false, unit: '', ...extra });
+
+  it('tells recipe lines, lines you changed and lines you added apart', () => {
+    expect(rowOrigin(line())).toBe('recipe');
+    expect(rowOrigin(line({ edited: true }))).toBe('adjusted');
+    expect(rowOrigin({ kind: 'extra', edited: false })).toBe('own');
+  });
+
+  it('captions them in plain words, with what the recipes need for a changed line', () => {
+    expect(rowCaption(line())).toBe('From recipes');
+    expect(rowCaption({ kind: 'extra', edited: false, unit: '' })).toBe('Added by you');
+    expect(rowCaption(line({ edited: true, planned: 8, plannedUnit: '' }))).toBe('Changed by you · recipes need 8');
+    expect(rowCaption(line({ edited: true, unit: 'g', planned: 1500, plannedUnit: 'g' }))).toBe('Changed by you · recipes need 1.5 kg');
+  });
+
+  it('leaves out what the recipes need when the unit was changed, since it cannot be compared', () => {
+    expect(rowCaption(line({ edited: true, unit: 'bag', planned: 8, plannedUnit: '' }))).toBe('Changed by you');
+  });
+
+  it('reflects real rows from applyEdits', () => {
+    const edits = editRow({}, WEEK, applyEdits(planned)[0], { name: 'rice', quantity: 500, unit: 'g' });
+    const row = applyEdits(planned, edits[WEEK]).find((r) => r.name === 'rice')!;
+    expect(rowCaption(row)).toBe('Changed by you · recipes need 700 g');
   });
 });

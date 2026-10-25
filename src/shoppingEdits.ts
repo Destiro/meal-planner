@@ -1,7 +1,8 @@
 import { aisleFor, matchKey } from './aisles';
 import { formatIngredient, isCountLike, parseIngredient, toBaseUnit } from './ingredients';
+import { formatQuantityLabel } from './quantity';
 import { byName, itemKey, ShoppingItem } from './shopping';
-import { ListEntry, ShoppingEdits, WeekList } from './types';
+import { ListEntry, Override, ShoppingEdits, WeekList } from './types';
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
@@ -14,6 +15,10 @@ export interface ListRow extends ShoppingItem {
   kind: 'planned' | 'extra';
   /** True for a planned item whose name or amount you changed. */
   edited: boolean;
+  /** What the recipes need right now, before your change. Only for planned items. */
+  planned?: number;
+  /** The unit `planned` is in, which differs from `unit` if you changed the unit. */
+  plannedUnit?: string;
 }
 
 /** A week's hand-added lines, shaped like list rows. */
@@ -48,15 +53,29 @@ export function entryToText(entry: ListEntry): string {
   return formatIngredient({ name: entry.name, quantity: entry.quantity, unit: entry.unit || undefined });
 }
 
-/** The planned shopping list with this week's hand edits applied, sorted by name. */
+/**
+ * The planned shopping list with this week's hand edits applied, sorted by name.
+ *
+ * A change you made to a line from your recipes is kept as an adjustment, so it follows the recipes: if you
+ * reduced 8 broccoli to 7 and the recipes later need 12, the line shows 11. A line whose adjustment takes it
+ * to nothing (you already have all that is needed) is left off. A change that also switched the unit, or one
+ * saved before adjustments existed, keeps the amount you set.
+ */
 export function applyEdits(planned: ShoppingItem[], week: WeekList = EMPTY_WEEK): ListRow[] {
   const rows: ListRow[] = [];
   for (const item of planned) {
     const key = itemKey(item);
     const override = week.overrides[key];
     if (override === null) continue; // removed
-    if (override) rows.push({ ...override, aisle: aisleFor(override.name), key, kind: 'planned', edited: true });
-    else rows.push({ ...item, key, kind: 'planned', edited: false });
+    if (override) {
+      const { base, ...entry } = override;
+      const follows = base !== undefined && entry.unit === item.unit;
+      const quantity = follows ? round(entry.quantity + (item.quantity - base)) : entry.quantity;
+      if (quantity <= 0.005) continue;
+      rows.push({ ...entry, quantity, aisle: aisleFor(entry.name), key, kind: 'planned', edited: true, planned: item.quantity, plannedUnit: item.unit });
+    } else {
+      rows.push({ ...item, key, kind: 'planned', edited: false, planned: item.quantity, plannedUnit: item.unit });
+    }
   }
   for (const extra of week.extras) {
     rows.push({
@@ -81,11 +100,14 @@ export function addExtra(edits: ShoppingEdits, weekKey: string, entry: ListEntry
   return withWeek(edits, weekKey, { ...week, extras: [...week.extras, { ...entry, id }] });
 }
 
-/** Changes a row's name and amount. For a planned item this is remembered as an override. */
+/**
+ * Changes a row's name and amount. For a planned item this is remembered as an override, along with what the
+ * recipes needed at the time (`row.planned`) so the change keeps following the recipes.
+ */
 export function editRow(
   edits: ShoppingEdits,
   weekKey: string,
-  row: Pick<ListRow, 'key' | 'kind'>,
+  row: Pick<ListRow, 'key' | 'kind' | 'planned'>,
   entry: ListEntry,
 ): ShoppingEdits {
   const week = weekOf(edits, weekKey);
@@ -93,7 +115,8 @@ export function editRow(
     const id = row.key.slice('extra:'.length);
     return withWeek(edits, weekKey, { ...week, extras: week.extras.map((e) => (e.id === id ? { ...entry, id } : e)) });
   }
-  return withWeek(edits, weekKey, { ...week, overrides: { ...week.overrides, [row.key]: entry } });
+  const override: Override = row.planned === undefined ? entry : { ...entry, base: row.planned };
+  return withWeek(edits, weekKey, { ...week, overrides: { ...week.overrides, [row.key]: override } });
 }
 
 /** Removes a row: hand-added items are deleted, planned items are hidden (and can be restored). */
@@ -150,7 +173,7 @@ export function applyShoppingActions(
   edits: ShoppingEdits,
   weekKey: string,
   rows: ListRow[],
-  actions: { action: 'add' | 'remove'; text: string }[],
+  actions: { action: 'add' | 'remove' | 'clear'; text: string }[],
   makeId: () => string,
 ): { edits: ShoppingEdits; added: number; increased: number; removed: number; reduced: number } {
   let result = edits;
@@ -163,6 +186,17 @@ export function applyShoppingActions(
   const gone = new Set<string>();
 
   for (const { action, text } of actions) {
+    if (action === 'clear') {
+      // Everything on the list now: lines from recipes, hand-added lines, and anything added earlier in this reply.
+      const live = [...extraRows(weekOf(result, weekKey)), ...planned.filter((row) => !gone.has(row.key))];
+      for (const row of live) {
+        result = removeRow(result, weekKey, row);
+        gone.add(row.key);
+      }
+      removed += live.length;
+      continue;
+    }
+
     const entry = entryFromText(text);
     if (!entry) continue;
     const key = matchKey(entry.name);
@@ -222,4 +256,33 @@ export function applyShoppingActions(
     else if (touched) removed++;
   }
   return { edits: result, added, increased, removed, reduced };
+}
+
+/**
+ * Empties a week's shopping list: hand-added lines are deleted and lines from your recipes are hidden (they
+ * can be brought back with "Restore removed items"). Ticks on those lines are cleared too.
+ */
+export function clearWeek(edits: ShoppingEdits, weekKey: string, rows: ListRow[]): ShoppingEdits {
+  return rows.reduce((acc, row) => removeRow(acc, weekKey, row), edits);
+}
+
+/** Where a line on the list comes from, which decides whether "Cooking for" affects it. */
+export type RowOrigin = 'recipe' | 'adjusted' | 'own';
+
+export function rowOrigin(row: Pick<ListRow, 'kind' | 'edited'>): RowOrigin {
+  if (row.kind === 'extra') return 'own';
+  return row.edited ? 'adjusted' : 'recipe';
+}
+
+/** A short label for a line saying where it comes from, shown under its name. */
+export function rowCaption(row: Pick<ListRow, 'kind' | 'edited' | 'unit' | 'planned' | 'plannedUnit'>): string {
+  const origin = rowOrigin(row);
+  if (origin === 'own') return 'Added by you';
+  if (origin === 'recipe') return 'From recipes';
+  // Say what the recipes need, unless you changed the unit and the two can't be compared.
+  const needs =
+    row.planned !== undefined && row.plannedUnit === row.unit
+      ? ` · recipes need ${formatQuantityLabel(row.planned, row.unit)}`
+      : '';
+  return `Changed by you${needs}`;
 }
