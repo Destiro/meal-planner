@@ -1,0 +1,18 @@
+{
+  "name": "meal-planner-api",
+  "private": true,
+  "description": "Cloudflare Worker that sits between the app and Spoonacular, so API keys stay off the phone.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261025.1",
+    "typescript": "~6.0.3",
+    "wrangler": "^4.152.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
