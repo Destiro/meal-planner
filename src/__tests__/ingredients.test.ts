@@ -1,4 +1,4 @@
-import { formatAmount, formatIngredient, isCountLike, parseIngredient } from '../ingredients';
+import { formatAmount, formatIngredient, formatIngredientFriendly, isCountLike, parseIngredient, scaleIngredient } from '../ingredients';
 
 describe('parseIngredient', () => {
   it.each([
@@ -119,5 +119,29 @@ describe('a times sign before the name', () => {
   it('keeps names that start with a number stuck to a word', () => {
     expect(parseIngredient('7up')).toEqual({ name: '7up' });
     expect(parseIngredient('5 alive')).toEqual({ name: 'alive', quantity: 5 });
+  });
+});
+
+describe('scaleIngredient and formatIngredientFriendly', () => {
+  it('multiplies amounts, keeps units and leaves amount-less ingredients alone', () => {
+    expect(scaleIngredient({ name: 'rice', quantity: 200, unit: 'g' }, 2.5)).toEqual({ name: 'rice', quantity: 500, unit: 'g' });
+    expect(scaleIngredient({ name: 'egg', quantity: 2 }, 1.5)).toEqual({ name: 'egg', quantity: 3 });
+    expect(scaleIngredient({ name: 'salt' }, 4)).toEqual({ name: 'salt' });
+    expect(scaleIngredient({ name: 'milk', quantity: 1, unit: 'cup' }, 1 / 3).quantity).toBe(0.33);
+  });
+
+  it('does not change the original', () => {
+    const original = { name: 'rice', quantity: 200, unit: 'g' };
+    scaleIngredient(original, 3);
+    expect(original.quantity).toBe(200);
+  });
+
+  it('writes big weights as kg and otherwise reads like formatIngredient', () => {
+    expect(formatIngredientFriendly({ name: 'rice', quantity: 1500, unit: 'g' })).toBe('1.5 kg rice');
+    expect(formatIngredientFriendly({ name: 'milk', quantity: 2000, unit: 'ml' })).toBe('2 l milk');
+    expect(formatIngredientFriendly({ name: 'rice', quantity: 200, unit: 'g' })).toBe('200 g rice');
+    expect(formatIngredientFriendly({ name: 'flour', quantity: 3, unit: 'bag' })).toBe('3 bags flour');
+    expect(formatIngredientFriendly({ name: 'egg', quantity: 6 })).toBe('6 egg');
+    expect(formatIngredientFriendly({ name: 'salt' })).toBe('salt');
   });
 });
