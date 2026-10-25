@@ -1,4 +1,5 @@
 import React from 'react';
+import { StatusBar } from 'expo-status-bar';
 import { Modal, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatIngredient } from '../ingredients';
@@ -17,7 +18,14 @@ interface Props {
 export function RecipePreviewModal({ recipe, onSave, onClose }: Props) {
   const steps = recipe.notes?.split('\n').filter(Boolean) ?? [];
   return (
-    <Modal visible animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible
+      statusBarTranslucent
+      navigationBarTranslucent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <StatusBar style="dark" />
       <SafeAreaView style={styles.screen}>
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={type.title}>{recipe.name}</Text>

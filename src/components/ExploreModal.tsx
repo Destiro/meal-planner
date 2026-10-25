@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
   FlatList,
@@ -62,7 +63,14 @@ export function ExploreModal({ onUse, onClose }: Props) {
   const inspire = () => run(() => randomOnline());
 
   return (
-    <Modal visible animationType="slide" onRequestClose={selected ? () => setSelected(null) : onClose}>
+    <Modal
+      visible
+      statusBarTranslucent
+      navigationBarTranslucent
+      animationType="slide"
+      onRequestClose={selected ? () => setSelected(null) : onClose}
+    >
+      <StatusBar style="dark" />
       <SafeAreaView style={styles.screen}>
         {selected ? (
           <Detail

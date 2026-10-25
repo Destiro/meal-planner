@@ -21,7 +21,10 @@ export function DayMeals({ dateKey, onPickSlot }: Props) {
             <Text style={styles.mealLabel} numberOfLines={2}>
               {label}
             </Text>
-            <Text style={name ? type.body : styles.empty}>{name ?? 'Add a meal'}</Text>
+            {/* flex: 1 lets a long name wrap onto a second line (then end in ...) instead of running off the screen. */}
+            <Text style={[name ? type.body : styles.empty, styles.mealName]} numberOfLines={2}>
+              {name ?? 'Add a meal'}
+            </Text>
           </Pressable>
         );
       })}
@@ -39,5 +42,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   mealLabel: { width: 90, fontSize: 13, color: colors.inkSoft },
+  mealName: { flex: 1 },
   empty: { fontSize: 15, color: colors.accent },
 });

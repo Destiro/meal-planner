@@ -1,4 +1,5 @@
 import React from 'react';
+import { StatusBar } from 'expo-status-bar';
 import { Alert, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatIngredientFriendly, scaleIngredient } from '../ingredients';
@@ -20,7 +21,14 @@ export function RecipeDetailModal({ recipe, household, onClose }: Props) {
   const people = (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`;
 
   return (
-    <Modal visible animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible
+      statusBarTranslucent
+      navigationBarTranslucent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <StatusBar style="dark" />
       <SafeAreaView style={styles.screen}>
         <ScrollView contentContainerStyle={styles.content}>
           <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close recipe">
