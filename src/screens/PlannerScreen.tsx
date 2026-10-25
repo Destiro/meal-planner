@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useRef, useState } from 'react';
-import { Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Pressable, ScrollView, ScrollViewInstance, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DayMeals } from '../components/DayMeals';
 import { MealSlotsModal } from '../components/MealSlotsModal';
@@ -47,7 +47,7 @@ export default function PlannerScreen() {
 
   // Crossfade between week and month: fade out, swap content, fade back in.
   const [fade] = useState(() => new Animated.Value(1));
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const switching = useRef(false);
 
   const toggleMode = () => {
