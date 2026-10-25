@@ -1,6 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { searchRecipes } from '../recipeFields';
+import { favouritesFirst, searchRecipes } from '../recipeFields';
 import { useStore } from '../store';
 import { colors, radius, spacing, type } from '../theme';
 import { MealType } from '../types';
@@ -28,7 +29,7 @@ export function RecipePickerModal({ slot, onClose }: Props) {
 function PickerSheet({ slot, onClose }: { slot: Slot; onClose: () => void }) {
   const { recipes, setMeal } = useStore();
   const [query, setQuery] = useState('');
-  const shown = useMemo(() => searchRecipes(recipes, query), [recipes, query]);
+  const shown = useMemo(() => favouritesFirst(searchRecipes(recipes, query)), [recipes, query]);
 
   return (
     <View style={styles.sheet}>
@@ -61,7 +62,8 @@ function PickerSheet({ slot, onClose }: { slot: Slot; onClose: () => void }) {
               onClose();
             }}
           >
-            <Text style={type.body}>{item.name}</Text>
+            <Text style={[type.body, styles.optionName]}>{item.name}</Text>
+            {item.favourite && <Ionicons name="heart" size={18} color={colors.danger} accessibilityLabel="Favourite" />}
           </Pressable>
         )}
       />
@@ -90,5 +92,6 @@ const styles = StyleSheet.create({
     maxHeight: '75%',
   },
   search: { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, padding: spacing.md, fontSize: 15, marginTop: spacing.md },
-  option: { paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
+  optionName: { flex: 1 },
+  option: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
 });

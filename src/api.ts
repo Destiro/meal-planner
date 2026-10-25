@@ -62,6 +62,8 @@ export interface ChatTurn {
 export interface ChatContext {
   pantry: string[];
   recipes: string[];
+  /** Which of those are marked as favourites. */
+  favourites?: string[];
   slots: string[];
   household: number;
   /** What is on the shopping list this week and next, including items you added yourself. */

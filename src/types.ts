@@ -26,6 +26,8 @@ export interface Recipe {
   tags?: string[];
   /** file:// uri of a photo copied into app storage. */
   photo?: string;
+  /** Marked as a favourite, so it can be filtered for and shown first. */
+  favourite?: boolean;
 }
 
 export interface Settings {

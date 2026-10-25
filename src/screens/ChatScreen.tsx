@@ -72,6 +72,7 @@ export default function ChatScreen() {
     return {
       pantry: pantry.map(pantryToText),
       recipes: recipes.map((r) => r.name),
+      favourites: recipes.filter((r) => r.favourite).map((r) => r.name),
       slots: settings.mealSlots.map((s) => s.label),
       household: settings.household,
       shopping: { thisWeek: listFor(0), nextWeek: listFor(1) },

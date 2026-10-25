@@ -135,3 +135,23 @@ describe('shopping list context', () => {
     expect(prompt).toContain('including everything they typed in themselves');
   });
 });
+
+describe('favourite recipes', () => {
+  it('are cleaned and kept in the request, defaulting to none', () => {
+    const result = parseChatRequest({ messages: [user('hi')], context: { favourites: ['Wrap', '', 5, ' Soup '] } });
+    expect(result).toMatchObject({ context: { favourites: ['Wrap', 'Soup'] } });
+    expect(parseChatRequest({ messages: [user('hi')] })).toMatchObject({ context: { favourites: [] } });
+  });
+
+  it('are listed for the assistant, separately so recipe names stay exact in plans', () => {
+    const prompt = buildSystemPrompt({ pantry: [], recipes: ['Wrap', 'Soup'], favourites: ['Soup'], slots: [], household: 2, shopping: { thisWeek: [], nextWeek: [] } });
+    expect(prompt).toContain('Saved recipes:\n- Wrap\n- Soup');
+    expect(prompt).toContain('Favourite recipes');
+    expect(prompt).toContain('use these:\n- Soup');
+  });
+
+  it('say so when none are marked', () => {
+    const prompt = buildSystemPrompt({ pantry: [], recipes: ['Wrap'], slots: [], household: 2, shopping: { thisWeek: [], nextWeek: [] } });
+    expect(prompt).toContain('(none marked yet)');
+  });
+});
