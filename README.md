@@ -10,12 +10,13 @@ Then scan the QR code with the Expo Go app on your Android phone,
 or press `a` to open an Android emulator.
 
 ## Structure
-- `App.tsx` – tab navigation (Plan, Recipes, Shopping)
+- `App.tsx` – tab navigation (Plan, Recipes, Pantry, Shopping)
 - `src/store.tsx` – app state + saving to the phone (AsyncStorage)
 - `src/types.ts` – Recipe / MealPlan data shapes
 - `src/migrate.ts` – saved-data versioning; upgrades older saves on load
 - `src/shopping.ts`, `ingredients.ts`, `aisles.ts` – shopping list maths (quantities, units, aisles)
 - `src/slots.ts`, `planUtils.ts`, `recipeFields.ts` – pure helpers for meal slots, week copying, tags/links
+- `src/pantry.ts`, `shoppingEdits.ts` – pantry subtraction and hand edits to shopping lists
 - `src/theme.ts` – colours, spacing, text styles
 - `src/screens/` – one file per screen
 - `src/components/` – shared UI pieces
