@@ -1,25 +1,42 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
-import { Pressable, SectionList, Share, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, SectionList, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
+import { EditItemModal } from '../components/EditItemModal';
 import { addDays, formatRange, startOfWeek, toKey } from '../dates';
-import { AisleSection, buildShoppingList, formatItemAmount, formatShoppingText, groupByAisle, itemKey } from '../shopping';
-import { useStore } from '../store';
+import { AisleSection, buildShoppingList, formatItemAmount, formatShoppingText, groupByAisle } from '../shopping';
+import {
+  addExtra,
+  applyEdits,
+  editRow,
+  EMPTY_WEEK,
+  entryFromText,
+  ListRow,
+  removedCount,
+  removeRow,
+  resetRow,
+  restoreRemoved,
+  setChecked,
+} from '../shoppingEdits';
+import { newId, useStore } from '../store';
 import { colors, radius, spacing, type } from '../theme';
 
-/** Builds a shopping list from the planned meals of a chosen week. */
+/** Builds a shopping list from the planned meals of a chosen week, which you can then edit by hand. */
 export default function ShoppingScreen() {
-  const { recipes, plan, settings, setHousehold, setGroupByAisle } = useStore();
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const { recipes, plan, settings, shoppingEdits, updateShoppingEdits, setHousehold, setGroupByAisle } = useStore();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [newItem, setNewItem] = useState('');
+  const [editing, setEditing] = useState<ListRow | null>(null);
 
   const thisWeekKey = toKey(startOfWeek(new Date()));
   const weekKey = toKey(weekStart);
   const label =
     weekKey === thisWeekKey ? 'This week' : weekKey === toKey(addDays(startOfWeek(new Date()), 7)) ? 'Next week' : 'Week of';
 
-  const items = useMemo(
-    () => buildShoppingList(
+  const planned = useMemo(
+    () =>
+      buildShoppingList(
         recipes,
         plan,
         weekStart,
@@ -29,45 +46,29 @@ export default function ShoppingScreen() {
     [recipes, plan, weekStart, settings.household, settings.mealSlots],
   );
 
-  const sections = useMemo<{ aisle: AisleSection['aisle'] | null; data: AisleSection['data'] }[]>(
-    () => (settings.groupByAisle ? groupByAisle(items) : [{ aisle: null, data: items }]),
-    [items, settings.groupByAisle],
+  const week = shoppingEdits[weekKey] ?? EMPTY_WEEK;
+  const rows = useMemo(() => applyEdits(planned, week), [planned, week]);
+  const removed = removedCount(planned, week);
+
+  const sections = useMemo<{ aisle: AisleSection['aisle'] | null; data: ListRow[] }[]>(
+    () => (settings.groupByAisle ? groupByAisle(rows) : [{ aisle: null, data: rows }]),
+    [rows, settings.groupByAisle],
   );
 
-  // Ticks are remembered per week so moving between weeks doesn't mix them up.
-  const tickKey = (key: string) => `${weekKey}|${key}`;
-
   // Shares what's still left to buy, so ticked-off items don't get sent along.
-  const remaining = items.filter((item) => !checked[tickKey(itemKey(item))]);
+  const remaining = rows.filter((row) => !week.checked[row.key]);
   const share = () =>
     Share.share({ message: formatShoppingText(remaining, `Shopping list, ${formatRange(weekStart)}`) }).catch(() => {});
 
-  return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => setWeekStart(addDays(weekStart, -7))}
-          hitSlop={12}
-          accessibilityLabel="Previous week"
-        >
-          <Text style={styles.arrow}>‹</Text>
-        </Pressable>
-        <View style={{ alignItems: 'center' }}>
-          <Text style={type.title}>Shopping list</Text>
-          <Text style={type.small}>
-            {label}, {formatRange(weekStart)}
-          </Text>
-        </View>
-        <Pressable onPress={() => setWeekStart(addDays(weekStart, 7))} hitSlop={12} accessibilityLabel="Next week">
-          <Text style={styles.arrow}>›</Text>
-        </Pressable>
-      </View>
-      {weekKey !== thisWeekKey && (
-        <Pressable onPress={() => setWeekStart(startOfWeek(new Date()))} hitSlop={8} style={styles.thisWeek}>
-          <Text style={styles.thisWeekText}>Back to this week</Text>
-        </Pressable>
-      )}
+  const addItem = () => {
+    const entry = entryFromText(newItem);
+    if (!entry) return;
+    updateShoppingEdits((edits) => addExtra(edits, weekKey, entry, newId()));
+    setNewItem('');
+  };
 
+  const header = (
+    <View>
       <View style={styles.household}>
         <Text style={type.body}>Cooking for</Text>
         <View style={styles.stepper}>
@@ -103,39 +104,133 @@ export default function ShoppingScreen() {
         />
       </View>
 
-      {items.length > 0 && (
+      <View style={styles.addRow}>
+        <TextInput
+          style={styles.addInput}
+          value={newItem}
+          onChangeText={setNewItem}
+          placeholder="Add an item, e.g. 2 bin bags"
+          returnKeyType="done"
+          onSubmitEditing={addItem}
+        />
+        <Button label="Add" onPress={addItem} disabled={!newItem.trim()} />
+      </View>
+
+      {rows.length > 0 && (
         <View style={styles.shareRow}>
           <Button label="Share list" variant="quiet" onPress={share} disabled={remaining.length === 0} />
         </View>
       )}
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => setWeekStart(addDays(weekStart, -7))}
+          hitSlop={12}
+          accessibilityLabel="Previous week"
+        >
+          <Text style={styles.arrow}>‹</Text>
+        </Pressable>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={type.title}>Shopping list</Text>
+          <Text style={type.small}>
+            {label}, {formatRange(weekStart)}
+          </Text>
+        </View>
+        <Pressable onPress={() => setWeekStart(addDays(weekStart, 7))} hitSlop={12} accessibilityLabel="Next week">
+          <Text style={styles.arrow}>›</Text>
+        </Pressable>
+      </View>
+      {weekKey !== thisWeekKey && (
+        <Pressable onPress={() => setWeekStart(startOfWeek(new Date()))} hitSlop={8} style={styles.thisWeek}>
+          <Text style={styles.thisWeekText}>Back to this week</Text>
+        </Pressable>
+      )}
+
       <SectionList
         sections={sections}
-        keyExtractor={itemKey}
+        keyExtractor={(row) => row.key}
         contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
         stickySectionHeadersEnabled={false}
+        ListHeaderComponent={header}
         renderSectionHeader={({ section }) =>
           section.aisle ? <Text style={styles.aisle}>{section.aisle}</Text> : null
         }
-        ListEmptyComponent={<Text style={type.small}>Plan some meals and their ingredients will show up here.</Text>}
+        ListEmptyComponent={
+          <Text style={type.small}>Plan some meals and their ingredients will show up here, or add your own items.</Text>
+        }
+        ListFooterComponent={
+          removed > 0 ? (
+            <Pressable
+              onPress={() => updateShoppingEdits((edits) => restoreRemoved(edits, weekKey))}
+              hitSlop={8}
+              style={styles.restore}
+            >
+              <Text style={styles.thisWeekText}>
+                Restore {removed} removed {removed === 1 ? 'item' : 'items'}
+              </Text>
+            </Pressable>
+          ) : undefined
+        }
         SectionSeparatorComponent={() => <View style={{ height: spacing.xs }} />}
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
-        renderItem={({ item }) => {
-          const done = !!checked[tickKey(itemKey(item))];
-          const amount = formatItemAmount(item);
+        renderItem={({ item: row }) => {
+          const done = !!week.checked[row.key];
+          const amount = formatItemAmount(row);
           return (
-            <Pressable
-              style={styles.row}
-              onPress={() => setChecked({ ...checked, [tickKey(itemKey(item))]: !done })}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: done }}
-            >
-              <View style={[styles.box, done && styles.boxDone]} />
-              <Text style={[type.body, { flex: 1 }, done && styles.struck]}>{item.name}</Text>
-              {!!amount && <Text style={type.small}>{amount}</Text>}
-            </Pressable>
+            <View style={styles.row}>
+              <Pressable
+                style={styles.rowMain}
+                onPress={() => updateShoppingEdits((edits) => setChecked(edits, weekKey, row.key, !done))}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: done }}
+              >
+                <View style={[styles.box, done && styles.boxDone]} />
+                <Text style={[type.body, { flex: 1 }, done && styles.struck]}>{row.name}</Text>
+                {!!amount && <Text style={type.small}>{amount}</Text>}
+              </Pressable>
+              <Pressable
+                onPress={() => setEditing(row)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${row.name}`}
+                style={styles.edit}
+              >
+                <Ionicons name="create-outline" size={20} color={row.edited ? colors.accent : colors.inkSoft} />
+              </Pressable>
+            </View>
           );
         }}
       />
+
+      {editing && (
+        <EditItemModal
+          // The row can be edited again straight after, so start each open from its current state.
+          key={editing.key}
+          row={editing}
+          onClose={() => setEditing(null)}
+          onSave={(entry) => {
+            updateShoppingEdits((edits) => editRow(edits, weekKey, editing, entry));
+            setEditing(null);
+          }}
+          onRemove={() => {
+            updateShoppingEdits((edits) => removeRow(edits, weekKey, editing));
+            setEditing(null);
+          }}
+          onReset={
+            editing.kind === 'planned' && editing.edited
+              ? () => {
+                  updateShoppingEdits((edits) => resetRow(edits, weekKey, editing.key));
+                  setEditing(null);
+                }
+              : undefined
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -146,15 +241,20 @@ const styles = StyleSheet.create({
   arrow: { fontSize: 36, color: colors.accent, paddingHorizontal: spacing.md },
   thisWeek: { alignSelf: 'center', paddingBottom: spacing.md },
   thisWeekText: { fontSize: 14, fontWeight: '600', color: colors.accent },
-  household: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  household: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: spacing.md },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   stepButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
   stepText: { fontSize: 22, color: colors.accent, fontWeight: '600', lineHeight: 26 },
   people: { minWidth: 24, textAlign: 'center' },
-  shareRow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  addRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.md },
+  addInput: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, padding: spacing.md, fontSize: 15 },
+  shareRow: { paddingBottom: spacing.md },
   aisle: { fontSize: 13, fontWeight: '700', color: colors.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, paddingTop: spacing.md },
   list: { padding: spacing.lg, paddingTop: 0 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line },
+  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line },
+  rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
+  edit: { padding: spacing.md },
+  restore: { alignItems: 'center', paddingTop: spacing.lg },
   box: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.accent },
   boxDone: { backgroundColor: colors.accent },
   struck: { textDecorationLine: 'line-through', color: colors.inkSoft },

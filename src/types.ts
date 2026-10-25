@@ -42,3 +42,24 @@ export type DayPlan = Partial<Record<MealType, string>>;
 
 /** Keyed by date string, YYYY-MM-DD. */
 export type MealPlan = Record<string, DayPlan>;
+
+/** One line of a shopping list. Amounts use base units (g, ml) like ShoppingItem. */
+export interface ListEntry {
+  name: string;
+  quantity: number;
+  /** '' for plain counts. */
+  unit: string;
+}
+
+/** Hand edits to one week's shopping list. */
+export interface WeekList {
+  /** Items added by hand. */
+  extras: (ListEntry & { id: string })[];
+  /** Changes to planned items, keyed by their generated key. null means removed. */
+  overrides: Record<string, ListEntry | null>;
+  /** Ticked rows, keyed by row key. */
+  checked: Record<string, boolean>;
+}
+
+/** Keyed by the Monday of the week, YYYY-MM-DD. */
+export type ShoppingEdits = Record<string, WeekList>;

@@ -1,9 +1,9 @@
 import { parseIngredient } from './ingredients';
 import { DEFAULT_SLOTS, isValidSlots } from './slots';
-import { MealPlan, Recipe, Settings } from './types';
+import { MealPlan, Recipe, Settings, ShoppingEdits } from './types';
 
 /** Bump when the saved shape changes, and teach `migrate` how to upgrade the old one. */
-export const DATA_VERSION = 2;
+export const DATA_VERSION = 3;
 
 export const DEFAULT_SETTINGS: Settings = { household: 2, groupByAisle: true, mealSlots: DEFAULT_SLOTS };
 export const DEFAULT_SERVINGS = 2;
@@ -13,6 +13,8 @@ export interface StoredData {
   recipes: Recipe[];
   plan: MealPlan;
   settings: Settings;
+  /** Added in v3: hand edits and ticks on each week's shopping list. */
+  shoppingEdits: ShoppingEdits;
 }
 
 /** Brings anything we have ever saved up to the current shape. Throws if it isn't recognisable. */
@@ -44,5 +46,9 @@ export function migrate(raw: unknown): StoredData {
     })),
     plan,
     settings,
+    shoppingEdits:
+      typeof data.shoppingEdits === 'object' && data.shoppingEdits !== null && !Array.isArray(data.shoppingEdits)
+        ? (data.shoppingEdits as ShoppingEdits)
+        : {},
   };
 }
