@@ -22,19 +22,21 @@ const byName = (a: ShoppingItem, b: ShoppingItem) => a.name.localeCompare(b.name
  * Ingredients for every meal planned in the 7 days starting at `weekStart`, merged by name and unit
  * ("tomato" and "Tomatoes" are one item). Quantities are scaled from each recipe's servings to
  * `household` people. An ingredient with no quantity (like "salt") counts as one each time it
- * appears and isn't scaled. Sorted by name.
+ * appears and isn't scaled. Meals in slots not listed in `slotIds` (when given) are skipped. Sorted by name.
  */
 export function buildShoppingList(
   recipes: Recipe[],
   plan: MealPlan,
   weekStart: Date,
   household: number,
+  slotIds?: string[],
 ): ShoppingItem[] {
   const totals = new Map<string, ShoppingItem>();
   for (let i = 0; i < 7; i++) {
     const day = plan[toKey(addDays(weekStart, i))];
     if (!day) continue;
-    for (const recipeId of Object.values(day)) {
+    for (const [slotId, recipeId] of Object.entries(day)) {
+      if (slotIds && !slotIds.includes(slotId)) continue;
       const recipe = recipes.find((r) => r.id === recipeId);
       if (!recipe) continue;
       const scale = recipe.servings > 0 ? household / recipe.servings : 1;

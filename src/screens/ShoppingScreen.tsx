@@ -19,8 +19,14 @@ export default function ShoppingScreen() {
     weekKey === thisWeekKey ? 'This week' : weekKey === toKey(addDays(startOfWeek(new Date()), 7)) ? 'Next week' : 'Week of';
 
   const items = useMemo(
-    () => buildShoppingList(recipes, plan, weekStart, settings.household),
-    [recipes, plan, weekStart, settings.household],
+    () => buildShoppingList(
+        recipes,
+        plan,
+        weekStart,
+        settings.household,
+        settings.mealSlots.map((slot) => slot.id),
+      ),
+    [recipes, plan, weekStart, settings.household, settings.mealSlots],
   );
 
   const sections = useMemo<{ aisle: AisleSection['aisle'] | null; data: AisleSection['data'] }[]>(

@@ -1,5 +1,10 @@
-export const MEAL_TYPES = ['breakfast', 'lunch', 'dinner'] as const;
-export type MealType = (typeof MEAL_TYPES)[number];
+/** Id of a meal slot, e.g. 'lunch'. Slots are configurable, see MealSlot. */
+export type MealType = string;
+
+export interface MealSlot {
+  id: MealType;
+  label: string;
+}
 
 export interface Ingredient {
   name: string;
@@ -28,6 +33,8 @@ export interface Settings {
   household: number;
   /** Show the shopping list split into supermarket aisles. */
   groupByAisle: boolean;
+  /** The meals planned each day, in order. */
+  mealSlots: MealSlot[];
 }
 
 /** Maps a meal slot to a recipe id. */

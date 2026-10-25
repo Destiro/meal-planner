@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react';
 import { Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DayMeals } from '../components/DayMeals';
+import { MealSlotsModal } from '../components/MealSlotsModal';
 import { MonthCalendar } from '../components/MonthCalendar';
 import { RecipePickerModal, Slot } from '../components/RecipePickerModal';
 import {
@@ -28,6 +29,7 @@ export default function PlannerScreen() {
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selected, setSelected] = useState(() => new Date());
   const [picking, setPicking] = useState<Slot | null>(null);
+  const [editingSlots, setEditingSlots] = useState(false);
   const { plan, copyWeekPlan } = useStore();
 
   const previousWeek = addDays(weekStart, -7);
@@ -107,6 +109,9 @@ export default function PlannerScreen() {
         <Pressable onPress={goToday} hitSlop={8}>
           <Text style={styles.today}>Today</Text>
         </Pressable>
+        <Pressable onPress={() => setEditingSlots(true)} hitSlop={8} accessibilityLabel="Choose which meals to plan">
+          <Ionicons name="options-outline" size={22} color={colors.accent} />
+        </Pressable>
       </View>
 
       <Animated.View
@@ -140,6 +145,7 @@ export default function PlannerScreen() {
       </Animated.View>
 
       <RecipePickerModal slot={picking} onClose={() => setPicking(null)} />
+      <MealSlotsModal visible={editingSlots} onClose={() => setEditingSlots(false)} />
     </SafeAreaView>
   );
 }

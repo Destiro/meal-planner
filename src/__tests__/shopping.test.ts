@@ -64,6 +64,12 @@ describe('buildShoppingList', () => {
     expect(buildShoppingList(recipes, plan, monday, 2)).toEqual([]);
   });
 
+  it('skips meals in slots that are no longer used', () => {
+    const plan: MealPlan = { '2026-10-12': { lunch: 'a', snack: 'b' } };
+    const names = buildShoppingList(recipes, plan, monday, 2, ['lunch']).map((i) => i.name);
+    expect(names).toEqual(['rice', 'tofu']);
+  });
+
   it('ignores meals whose recipe no longer exists', () => {
     expect(buildShoppingList(recipes, { '2026-10-12': { lunch: 'gone' } }, monday, 2)).toEqual([]);
   });

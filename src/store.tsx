@@ -3,7 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { parseIngredient } from './ingredients';
 import { DEFAULT_SERVINGS, DEFAULT_SETTINGS, DATA_VERSION, migrate } from './migrate';
 import { copyWeek } from './planUtils';
-import { MealPlan, MealType, Recipe, Settings } from './types';
+import { MealPlan, MealSlot, MealType, Recipe, Settings } from './types';
 
 // The key predates versioning, so it keeps its "v1" name; the version lives inside the data.
 const STORAGE_KEY = 'mealplanner:v1';
@@ -38,6 +38,7 @@ interface StoreValue {
   copyWeekPlan: (from: Date, to: Date) => void;
   setHousehold: (people: number) => void;
   setGroupByAisle: (on: boolean) => void;
+  setMealSlots: (slots: MealSlot[]) => void;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -130,9 +131,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setSettings((prev) => ({ ...prev, groupByAisle: on }));
   }, []);
 
+  const setMealSlots = useCallback((mealSlots: MealSlot[]) => {
+    setSettings((prev) => ({ ...prev, mealSlots }));
+  }, []);
+
   const value = useMemo(
-    () => ({ ready, recipes, plan, settings, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle }),
-    [ready, recipes, plan, settings, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle],
+    () => ({ ready, recipes, plan, settings, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots }),
+    [ready, recipes, plan, settings, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

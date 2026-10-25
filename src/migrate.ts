@@ -1,10 +1,11 @@
 import { parseIngredient } from './ingredients';
+import { DEFAULT_SLOTS, isValidSlots } from './slots';
 import { MealPlan, Recipe, Settings } from './types';
 
 /** Bump when the saved shape changes, and teach `migrate` how to upgrade the old one. */
 export const DATA_VERSION = 2;
 
-export const DEFAULT_SETTINGS: Settings = { household: 2, groupByAisle: true };
+export const DEFAULT_SETTINGS: Settings = { household: 2, groupByAisle: true, mealSlots: DEFAULT_SLOTS };
 export const DEFAULT_SERVINGS = 2;
 
 export interface StoredData {
@@ -24,6 +25,13 @@ export function migrate(raw: unknown): StoredData {
   const recipes = Array.isArray(data.recipes) ? data.recipes : [];
   const plan = typeof data.plan === 'object' && data.plan !== null ? (data.plan as MealPlan) : {};
 
+  const saved = typeof data.settings === 'object' && data.settings !== null ? (data.settings as Partial<Settings>) : {};
+  const settings: Settings = {
+    ...DEFAULT_SETTINGS,
+    ...saved,
+    mealSlots: isValidSlots(saved.mealSlots) ? saved.mealSlots : DEFAULT_SLOTS,
+  };
+
   return {
     version: DATA_VERSION,
     // v1 stored ingredients as plain strings.
@@ -35,6 +43,6 @@ export function migrate(raw: unknown): StoredData {
       ),
     })),
     plan,
-    settings: { ...DEFAULT_SETTINGS, ...(typeof data.settings === 'object' ? (data.settings as object) : {}) },
+    settings,
   };
 }
