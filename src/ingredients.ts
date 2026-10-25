@@ -140,3 +140,14 @@ export function toBaseUnit(quantity: number, unit: string): { quantity: number; 
   const base = BASE_UNITS[unit];
   return base ? { quantity: quantity * base.factor, unit: base.base } : { quantity, unit };
 }
+
+/** An ingredient with its amount multiplied, for example to cook for more people. One with no amount is unchanged. */
+export function scaleIngredient(ing: Ingredient, factor: number): Ingredient {
+  return ing.quantity === undefined ? ing : { ...ing, quantity: round(ing.quantity * factor) };
+}
+
+/** Like formatIngredient, but large weights and volumes read as kg and l: "1.5 kg rice". */
+export function formatIngredientFriendly(ing: Ingredient): string {
+  if (ing.quantity === undefined || !ing.unit) return formatIngredient(ing);
+  return `${formatAmount(ing.quantity, ing.unit)} ${ing.name}`;
+}

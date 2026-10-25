@@ -3,8 +3,10 @@ import React, { useRef, useState } from 'react';
 import { Alert, Animated, Pressable, ScrollView, ScrollViewInstance, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DayMeals } from '../components/DayMeals';
+import { MealActionsModal } from '../components/MealActionsModal';
 import { MealSlotsModal } from '../components/MealSlotsModal';
 import { MonthCalendar } from '../components/MonthCalendar';
+import { RecipeDetailModal } from '../components/RecipeDetailModal';
 import { RecipePickerModal, Slot } from '../components/RecipePickerModal';
 import {
   addDays,
@@ -19,6 +21,7 @@ import {
 } from '../dates';
 import { weekHasMeals } from '../planUtils';
 import { useStore } from '../store';
+import { Recipe } from '../types';
 import { colors, radius, spacing, type } from '../theme';
 
 type Mode = 'week' | 'month';
@@ -29,8 +32,11 @@ export default function PlannerScreen() {
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selected, setSelected] = useState(() => new Date());
   const [picking, setPicking] = useState<Slot | null>(null);
+  // A meal that is already planned: the slot whose actions are showing, and the recipe being read.
+  const [acting, setActing] = useState<Slot | null>(null);
+  const [viewing, setViewing] = useState<Recipe | null>(null);
   const [editingSlots, setEditingSlots] = useState(false);
-  const { plan, copyWeekPlan } = useStore();
+  const { plan, recipes, settings, copyWeekPlan, setMeal } = useStore();
 
   const previousWeek = addDays(weekStart, -7);
   const canCopy = weekHasMeals(plan, previousWeek);
@@ -62,7 +68,13 @@ export default function PlannerScreen() {
       });
     });
   };
-  const openPicker = (dateKey: string, meal: Slot['meal']) => setPicking({ dateKey, meal });
+  // An empty slot goes straight to choosing a recipe. A planned one asks whether to view, change or clear it.
+  const openSlot = (dateKey: string, meal: Slot['meal']) => {
+    const planned = recipes.some((r) => r.id === plan[dateKey]?.[meal]);
+    if (planned) setActing({ dateKey, meal });
+    else setPicking({ dateKey, meal });
+  };
+  const actingRecipe = acting ? recipes.find((r) => r.id === plan[acting.dateKey]?.[acting.meal]) : undefined;
 
   const step = (dir: -1 | 1) => {
     if (mode === 'week') setWeekStart(addDays(weekStart, 7 * dir));
@@ -128,7 +140,7 @@ export default function PlannerScreen() {
             return (
               <View key={key} style={[styles.card, key === todayKey && styles.cardToday]}>
                 <Text style={type.heading}>{formatDay(d)}</Text>
-                <DayMeals dateKey={key} onPickSlot={openPicker} />
+                <DayMeals dateKey={key} onPickSlot={openSlot} />
               </View>
             );
           })
@@ -137,7 +149,7 @@ export default function PlannerScreen() {
             <MonthCalendar month={month} selectedKey={toKey(selected)} onSelect={setSelected} />
             <View style={styles.card}>
               <Text style={type.heading}>{formatDay(selected)}</Text>
-              <DayMeals dateKey={toKey(selected)} onPickSlot={openPicker} />
+              <DayMeals dateKey={toKey(selected)} onPickSlot={openSlot} />
             </View>
           </>
         )}
@@ -145,6 +157,28 @@ export default function PlannerScreen() {
       </Animated.View>
 
       <RecipePickerModal slot={picking} onClose={() => setPicking(null)} />
+
+      {acting && actingRecipe && (
+        <MealActionsModal
+          mealLabel={settings.mealSlots.find((s) => s.id === acting.meal)?.label ?? acting.meal}
+          recipeName={actingRecipe.name}
+          onClose={() => setActing(null)}
+          onView={() => {
+            setViewing(actingRecipe);
+            setActing(null);
+          }}
+          onChange={() => {
+            setPicking(acting);
+            setActing(null);
+          }}
+          onClear={() => {
+            setMeal(acting.dateKey, acting.meal, null);
+            setActing(null);
+          }}
+        />
+      )}
+
+      {viewing && <RecipeDetailModal recipe={viewing} household={settings.household} onClose={() => setViewing(null)} />}
       <MealSlotsModal visible={editingSlots} onClose={() => setEditingSlots(false)} />
     </SafeAreaView>
   );
