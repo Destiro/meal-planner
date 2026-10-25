@@ -70,30 +70,52 @@ export function applyPantry(items: ShoppingItem[], pantry: PantryItem[]): { item
 }
 
 /**
- * Applies pantry changes suggested by the assistant. "Add" lines go through addToPantry (so amounts add up),
- * "Remove" lines take the whole item out, matching names like tomato and Tomatoes as the same thing.
- * Lines that can't be read are ignored. `added` and `removed` count what actually changed.
+ * Applies pantry changes suggested by the assistant.
+ *
+ * - "Add" goes through addToPantry, so amounts add up.
+ * - "Remove" with an amount ("200 g rice") uses that much up, and takes the item out once it is all gone.
+ *   An amount in a different unit, or against something you always have (like salt), is left alone.
+ * - "Remove" with no amount ("rice") takes the whole item out.
+ *
+ * Plurals count as the same thing. Lines that can't be read are ignored. `added`, `removed` (taken out
+ * entirely) and `reduced` (lowered but still there) count what actually changed.
  */
 export function applyPantryActions(
   pantry: PantryItem[],
   actions: { action: 'add' | 'remove'; text: string }[],
   makeId: () => string,
-): { pantry: PantryItem[]; added: number; removed: number } {
+): { pantry: PantryItem[]; added: number; removed: number; reduced: number } {
   let result = pantry;
   let added = 0;
   let removed = 0;
+  let reduced = 0;
   for (const { action, text } of actions) {
     const entry = pantryEntryFromText(text);
     if (!entry) continue;
     if (action === 'add') {
       result = addToPantry(result, entry, makeId());
       added++;
-    } else {
-      const key = matchKey(entry.name);
+      continue;
+    }
+
+    const key = matchKey(entry.name);
+    if (entry.quantity === undefined) {
       const kept = result.filter((p) => matchKey(p.name) !== key);
       if (kept.length !== result.length) removed++;
       result = kept;
+      continue;
+    }
+
+    const have = result.find((p) => matchKey(p.name) === key && p.unit === entry.unit && p.quantity !== undefined);
+    if (!have || have.quantity === undefined) continue;
+    const left = round(have.quantity - entry.quantity);
+    if (left <= 0.005) {
+      result = result.filter((p) => p !== have);
+      removed++;
+    } else {
+      result = result.map((p) => (p === have ? { ...p, quantity: left } : p));
+      reduced++;
     }
   }
-  return { pantry: result, added, removed };
+  return { pantry: result, added, removed, reduced };
 }

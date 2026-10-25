@@ -142,7 +142,67 @@ describe('applyShoppingActions', () => {
 
   it('ignores unreadable lines and does not change the input', () => {
     const before = JSON.stringify(none);
-    expect(applyShoppingActions(none, WEEK, rows, [{ action: 'add', text: '  ' }], makeId)).toEqual({ edits: none, added: 0, removed: 0 });
+    expect(applyShoppingActions(none, WEEK, rows, [{ action: 'add', text: '  ' }], makeId)).toEqual({ edits: none, added: 0, removed: 0, reduced: 0 });
     expect(JSON.stringify(none)).toBe(before);
+  });
+});
+
+describe('applyShoppingActions: removing an amount', () => {
+  let n = 0;
+  const makeId = () => `m${++n}`;
+  const bags = (quantity: number) => addExtra(none, WEEK, { name: 'shopping bags', quantity, unit: '' }, 'bags');
+  const bagQuantities = (edits: ShoppingEdits) => edits[WEEK].extras.map((e) => [e.name, e.quantity]);
+
+  it('takes off just the amount asked for ("remove 2 of the 3 shopping bags")', () => {
+    const result = applyShoppingActions(bags(3), WEEK, [], [{ action: 'remove', text: '2 shopping bags' }], makeId);
+    expect(bagQuantities(result.edits)).toEqual([['shopping bags', 1]]);
+    expect(result).toMatchObject({ removed: 0, reduced: 1 });
+  });
+
+  it('still removes the whole item when no amount is given', () => {
+    const result = applyShoppingActions(bags(3), WEEK, [], [{ action: 'remove', text: 'shopping bags' }], makeId);
+    expect(result.edits[WEEK].extras).toEqual([]);
+    expect(result).toMatchObject({ removed: 1, reduced: 0 });
+  });
+
+  it('removes the line when the amount covers all of it, or more', () => {
+    for (const text of ['3 shopping bags', '5 shopping bags']) {
+      const result = applyShoppingActions(bags(3), WEEK, [], [{ action: 'remove', text }], makeId);
+      expect(result.edits[WEEK].extras).toEqual([]);
+      expect(result).toMatchObject({ removed: 1, reduced: 0 });
+    }
+  });
+
+  it('reduces planned items too, keeping what is left, and converts kg to g', () => {
+    const rows = applyEdits(planned);
+    const result = applyShoppingActions(none, WEEK, rows, [{ action: 'remove', text: '0.2 kg rice' }], makeId);
+    expect(result.reduced).toBe(1);
+    expect(applyEdits(planned, result.edits[WEEK]).find((r) => r.name === 'rice')).toMatchObject({ quantity: 500, edited: true });
+  });
+
+  it('uses up hand-added lines before planned ones', () => {
+    const extra = addExtra(none, WEEK, { name: 'rice', quantity: 100, unit: 'g' }, 'r');
+    const rows = applyEdits(planned, extra[WEEK]);
+    const result = applyShoppingActions(extra, WEEK, rows, [{ action: 'remove', text: '300 g rice' }], makeId);
+    expect(result.edits[WEEK].extras).toEqual([]);
+    expect(applyEdits(planned, result.edits[WEEK]).find((r) => r.name === 'rice')).toMatchObject({ quantity: 500 });
+  });
+
+  it('leaves an item alone when the unit differs, since the amounts cannot be compared', () => {
+    const rows = applyEdits(planned);
+    const result = applyShoppingActions(none, WEEK, rows, [{ action: 'remove', text: '2 rice' }], makeId);
+    expect(result).toMatchObject({ removed: 0, reduced: 0 });
+    expect(applyEdits(planned, result.edits[WEEK]).find((r) => r.name === 'rice')).toMatchObject({ quantity: 700 });
+  });
+
+  it('handles several removals of the same item in one reply', () => {
+    const result = applyShoppingActions(
+      bags(5),
+      WEEK,
+      [],
+      [{ action: 'remove', text: '2 shopping bags' }, { action: 'remove', text: '1 shopping bags' }],
+      makeId,
+    );
+    expect(bagQuantities(result.edits)).toEqual([['shopping bags', 2]]);
   });
 });

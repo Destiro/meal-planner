@@ -6,7 +6,8 @@ import { Button } from '../components/Button';
 import { EditItemModal } from '../components/EditItemModal';
 import { addDays, formatRange, startOfWeek, toKey } from '../dates';
 import { addToPantry } from '../pantry';
-import { AisleSection, formatItemAmount, formatShoppingText, groupByAisle } from '../shopping';
+import { canDecrease, formatQuantityLabel, nextQuantity } from '../quantity';
+import { AisleSection, formatShoppingText, groupByAisle } from '../shopping';
 import {
   addExtra,
   editRow,
@@ -196,7 +197,15 @@ export default function ShoppingScreen() {
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         renderItem={({ item: row }) => {
           const done = !!week.checked[row.key];
-          const amount = formatItemAmount(row);
+          // Changes the quantity on the spot. For a planned item this is remembered as your own amount.
+          const change = (direction: 1 | -1) =>
+            updateShoppingEdits((edits) =>
+              editRow(edits, weekKey, row, {
+                name: row.name,
+                quantity: nextQuantity(row.quantity, row.unit, direction),
+                unit: row.unit,
+              }),
+            );
           return (
             <View style={styles.row}>
               <Pressable
@@ -207,8 +216,31 @@ export default function ShoppingScreen() {
               >
                 <View style={[styles.box, done && styles.boxDone]} />
                 <Text style={[type.body, { flex: 1 }, done && styles.struck]}>{row.name}</Text>
-                {!!amount && <Text style={type.small}>{amount}</Text>}
               </Pressable>
+              <View style={styles.quantity}>
+                <Pressable
+                  onPress={() => change(-1)}
+                  disabled={!canDecrease(row.quantity, row.unit)}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Less ${row.name}`}
+                  style={[styles.qtyButton, !canDecrease(row.quantity, row.unit) && { opacity: 0.35 }]}
+                >
+                  <Text style={styles.qtyButtonText}>−</Text>
+                </Pressable>
+                <Text style={styles.qtyLabel} accessibilityLabel={`${formatQuantityLabel(row.quantity, row.unit)} of ${row.name}`}>
+                  {formatQuantityLabel(row.quantity, row.unit)}
+                </Text>
+                <Pressable
+                  onPress={() => change(1)}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel={`More ${row.name}`}
+                  style={styles.qtyButton}
+                >
+                  <Text style={styles.qtyButtonText}>+</Text>
+                </Pressable>
+              </View>
               <Pressable
                 onPress={() => setEditing(row)}
                 hitSlop={8}
@@ -276,7 +308,11 @@ const styles = StyleSheet.create({
   list: { padding: spacing.lg, paddingTop: 0 },
   row: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line },
   rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
-  edit: { padding: spacing.md },
+  quantity: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  qtyButton: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  qtyButtonText: { fontSize: 18, color: colors.accent, fontWeight: '600', lineHeight: 22 },
+  qtyLabel: { minWidth: 44, textAlign: 'center', fontSize: 14, fontWeight: '600', color: colors.ink },
+  edit: { paddingVertical: spacing.md, paddingHorizontal: spacing.sm },
   restore: { alignItems: 'center', paddingTop: spacing.lg },
   box: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.accent },
   boxDone: { backgroundColor: colors.accent },

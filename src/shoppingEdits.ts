@@ -3,6 +3,8 @@ import { formatIngredient, parseIngredient, toBaseUnit } from './ingredients';
 import { byName, itemKey, ShoppingItem } from './shopping';
 import { ListEntry, ShoppingEdits, WeekList } from './types';
 
+const round = (n: number) => Math.round(n * 100) / 100;
+
 export const EMPTY_WEEK: WeekList = { extras: [], overrides: {}, checked: {} };
 
 /** A line on the shopping list: either planned from recipes or added by hand, possibly edited. */
@@ -119,10 +121,16 @@ export function pruneWeeks(edits: ShoppingEdits, keepFromWeekKey: string): Shopp
 }
 
 /**
- * Applies shopping list changes suggested by the assistant to one week's list. "Add" puts the item on as
- * a hand-added line (or adds to one that is already there with the same unit). "Remove" takes every line
- * with that name off the list, whether it came from your recipes or you added it, treating plurals alike.
- * Lines that can't be read are ignored. `added` and `removed` count what actually changed.
+ * Applies shopping list changes suggested by the assistant to one week's list.
+ *
+ * - "Add" puts the item on as a hand-added line, or adds to one already there with the same unit.
+ * - "Remove" with an amount ("2 bin bags") takes off just that much, and takes the line off once nothing is
+ *   left. Hand-added lines are reduced before planned ones. An amount in a different unit is left alone,
+ *   since the two can't be compared.
+ * - "Remove" with no amount ("bin bags") takes every line with that name off the list.
+ *
+ * Plurals count as the same item. Lines that can't be read are ignored. `added`, `removed` (taken off
+ * entirely) and `reduced` (lowered but still on the list) count what actually changed.
  */
 export function applyShoppingActions(
   edits: ShoppingEdits,
@@ -130,11 +138,14 @@ export function applyShoppingActions(
   rows: ListRow[],
   actions: { action: 'add' | 'remove'; text: string }[],
   makeId: () => string,
-): { edits: ShoppingEdits; added: number; removed: number } {
+): { edits: ShoppingEdits; added: number; removed: number; reduced: number } {
   let result = edits;
   let added = 0;
   let removed = 0;
-  const removedKeys = new Set<string>();
+  let reduced = 0;
+  // The planned lines as they are right now, since earlier actions in the same reply may have changed them.
+  const planned = rows.filter((row) => row.kind === 'planned').map((row) => ({ ...row }));
+  const gone = new Set<string>();
 
   for (const { action, text } of actions) {
     const entry = entryFromText(text);
@@ -159,12 +170,38 @@ export function applyShoppingActions(
       kind: 'extra',
       edited: false,
     }));
-    const matches = [...rows, ...extras].filter((row) => matchKey(row.name) === key && !removedKeys.has(row.key));
-    for (const row of matches) {
-      result = removeRow(result, weekKey, row);
-      removedKeys.add(row.key);
+    const matches = [...extras, ...planned.filter((row) => !gone.has(row.key))].filter((row) => matchKey(row.name) === key);
+
+    if (parseIngredient(text).quantity === undefined) {
+      for (const row of matches) {
+        result = removeRow(result, weekKey, row);
+        gone.add(row.key);
+      }
+      if (matches.length) removed++;
+      continue;
     }
-    if (matches.length) removed++;
+
+    let left = entry.quantity;
+    let touched = false;
+    let partial = false;
+    for (const row of matches.filter((r) => r.unit === entry.unit)) {
+      if (left <= 0.005) break;
+      touched = true;
+      if (row.quantity <= left + 0.005) {
+        result = removeRow(result, weekKey, row);
+        gone.add(row.key);
+        left = round(left - row.quantity);
+      } else {
+        const quantity = round(row.quantity - left);
+        result = editRow(result, weekKey, row, { name: row.name, quantity, unit: row.unit });
+        const live = planned.find((p) => p.key === row.key);
+        if (live) live.quantity = quantity;
+        left = 0;
+        partial = true;
+      }
+    }
+    if (touched && partial) reduced++;
+    else if (touched) removed++;
   }
-  return { edits: result, added, removed };
+  return { edits: result, added, removed, reduced };
 }
