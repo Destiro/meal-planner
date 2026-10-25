@@ -32,6 +32,7 @@ interface StoreValue {
   plan: MealPlan;
   settings: Settings;
   addRecipe: (recipe: RecipeInput) => void;
+  updateRecipe: (id: string, recipe: RecipeInput) => void;
   deleteRecipe: (id: string) => void;
   setMeal: (dateKey: string, meal: MealType, recipeId: string | null) => void;
   copyWeekPlan: (from: Date, to: Date) => void;
@@ -91,6 +92,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setRecipes((prev) => [...prev, { id: uid(), ...recipe }]);
   }, []);
 
+  const updateRecipe = useCallback((id: string, recipe: RecipeInput) => {
+    setRecipes((prev) => prev.map((r) => (r.id === id ? { id, ...recipe } : r)));
+  }, []);
+
   const deleteRecipe = useCallback((id: string) => {
     setRecipes((prev) => prev.filter((r) => r.id !== id));
     // Remove any planned meals that used this recipe.
@@ -126,8 +131,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ ready, recipes, plan, settings, addRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle }),
-    [ready, recipes, plan, settings, addRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle],
+    () => ({ ready, recipes, plan, settings, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle }),
+    [ready, recipes, plan, settings, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

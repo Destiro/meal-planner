@@ -15,6 +15,12 @@ export interface Recipe {
   /** How many people the quantities feed. */
   servings: number;
   ingredients: Ingredient[];
+  notes?: string;
+  /** http(s) link to where the recipe came from. */
+  sourceUrl?: string;
+  tags?: string[];
+  /** file:// uri of a photo copied into app storage. */
+  photo?: string;
 }
 
 export interface Settings {
