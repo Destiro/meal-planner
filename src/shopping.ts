@@ -24,3 +24,9 @@ export function buildShoppingList(recipes: Recipe[], plan: MealPlan, weekStart: 
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
+
+/** Plain-text version of the list, suitable for pasting into a messaging app or notes. */
+export function formatShoppingText(items: ShoppingItem[], title: string): string {
+  const lines = items.map(({ name, count }) => `• ${name}${count > 1 ? ` ×${count}` : ''}`);
+  return [title, ...lines].join('\n');
+}

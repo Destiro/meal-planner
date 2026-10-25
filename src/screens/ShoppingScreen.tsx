@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Button } from '../components/Button';
 import { addDays, formatRange, startOfWeek, toKey } from '../dates';
-import { buildShoppingList } from '../shopping';
+import { buildShoppingList, formatShoppingText } from '../shopping';
 import { useStore } from '../store';
 import { colors, radius, spacing, type } from '../theme';
 
@@ -21,6 +22,11 @@ export default function ShoppingScreen() {
 
   // Ticks are remembered per week so moving between weeks doesn't mix them up.
   const tickKey = (name: string) => `${weekKey}|${name}`;
+
+  // Shares what's still left to buy, so ticked-off items don't get sent along.
+  const remaining = items.filter((item) => !checked[tickKey(item.name)]);
+  const share = () =>
+    Share.share({ message: formatShoppingText(remaining, `Shopping list, ${formatRange(weekStart)}`) }).catch(() => {});
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -46,6 +52,11 @@ export default function ShoppingScreen() {
         <Pressable onPress={() => setWeekStart(startOfWeek(new Date()))} hitSlop={8} style={styles.thisWeek}>
           <Text style={styles.thisWeekText}>Back to this week</Text>
         </Pressable>
+      )}
+      {items.length > 0 && (
+        <View style={styles.shareRow}>
+          <Button label="Share list" variant="quiet" onPress={share} disabled={remaining.length === 0} />
+        </View>
       )}
       <FlatList
         data={items}
@@ -78,6 +89,7 @@ const styles = StyleSheet.create({
   arrow: { fontSize: 36, color: colors.accent, paddingHorizontal: spacing.md },
   thisWeek: { alignSelf: 'center', paddingBottom: spacing.md },
   thisWeekText: { fontSize: 14, fontWeight: '600', color: colors.accent },
+  shareRow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   list: { padding: spacing.lg, paddingTop: 0, gap: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line },
   box: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.accent },

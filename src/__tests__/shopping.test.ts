@@ -1,4 +1,4 @@
-import { buildShoppingList } from '../shopping';
+import { buildShoppingList, formatShoppingText } from '../shopping';
 import { MealPlan, Recipe } from '../types';
 
 const recipes: Recipe[] = [
@@ -24,5 +24,19 @@ describe('buildShoppingList', () => {
 
   it('ignores meals whose recipe no longer exists', () => {
     expect(buildShoppingList(recipes, { '2026-10-12': { lunch: 'gone' } }, monday)).toEqual([]);
+  });
+});
+
+describe('formatShoppingText', () => {
+  it('writes a title followed by one bullet per item', () => {
+    expect(
+      formatShoppingText(
+        [
+          { name: 'rice', count: 2 },
+          { name: 'tofu', count: 1 },
+        ],
+        'Shopping list',
+      ),
+    ).toBe('Shopping list\n• rice ×2\n• tofu');
   });
 });
