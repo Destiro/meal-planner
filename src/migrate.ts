@@ -1,9 +1,9 @@
 import { parseIngredient } from './ingredients';
 import { DEFAULT_SLOTS, isValidSlots } from './slots';
-import { MealPlan, Recipe, Settings, ShoppingEdits } from './types';
+import { MealPlan, PantryItem, Recipe, Settings, ShoppingEdits } from './types';
 
 /** Bump when the saved shape changes, and teach `migrate` how to upgrade the old one. */
-export const DATA_VERSION = 3;
+export const DATA_VERSION = 4;
 
 export const DEFAULT_SETTINGS: Settings = { household: 2, groupByAisle: true, mealSlots: DEFAULT_SLOTS };
 export const DEFAULT_SERVINGS = 2;
@@ -15,6 +15,8 @@ export interface StoredData {
   settings: Settings;
   /** Added in v3: hand edits and ticks on each week's shopping list. */
   shoppingEdits: ShoppingEdits;
+  /** Added in v4: what you already have at home. */
+  pantry: PantryItem[];
 }
 
 /** Brings anything we have ever saved up to the current shape. Throws if it isn't recognisable. */
@@ -50,5 +52,8 @@ export function migrate(raw: unknown): StoredData {
       typeof data.shoppingEdits === 'object' && data.shoppingEdits !== null && !Array.isArray(data.shoppingEdits)
         ? (data.shoppingEdits as ShoppingEdits)
         : {},
+    pantry: Array.isArray(data.pantry)
+      ? data.pantry.filter((p): p is PantryItem => typeof p?.id === 'string' && typeof p?.name === 'string')
+      : [],
   };
 }

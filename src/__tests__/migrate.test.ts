@@ -15,6 +15,7 @@ describe('migrate', () => {
       plan: { '2026-10-12': { lunch: 'r' } },
       settings: { household: 2, groupByAisle: true, mealSlots: DEFAULT_SLOTS },
       shoppingEdits: {},
+      pantry: [],
     });
   });
 
@@ -31,9 +32,16 @@ describe('migrate', () => {
       recipes: [{ id: 'r', name: 'X', servings: 4, ingredients: [{ name: 'egg', quantity: 2 }] }],
       plan: {},
       settings: { household: 3, groupByAisle: false, mealSlots: [{ id: 'snack-1', label: 'Snack' }] },
+      pantry: [{ id: 'p1', name: 'rice', quantity: 500, unit: 'g' }, { id: 'p2', name: 'salt', unit: '' }],
       shoppingEdits: { '2026-10-12': { extras: [], overrides: { 'rice|g': null }, checked: { 'tofu|': true } } },
     };
     expect(migrate(current)).toEqual(current);
+  });
+
+  it('upgrades v3 data by adding an empty pantry, and drops unusable pantry entries', () => {
+    expect(migrate({ version: 3, recipes: [], plan: {} }).pantry).toEqual([]);
+    const messy = { pantry: [{ id: 'a', name: 'rice', unit: 'g' }, { name: 'no id' }, null, 'x'] };
+    expect(migrate(messy).pantry).toEqual([{ id: 'a', name: 'rice', unit: 'g' }]);
   });
 
   it('falls back to the default meal slots when the saved ones are unusable', () => {

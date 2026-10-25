@@ -1,46 +1,64 @@
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { entryFromText, entryToText, ListRow } from '../shoppingEdits';
 import { colors, radius, spacing, type } from '../theme';
-import { ListEntry } from '../types';
 import { Button } from './Button';
 
 interface Props {
-  row: ListRow;
-  onSave: (entry: ListEntry) => void;
+  title: string;
+  /** What the text box starts with. */
+  initialText: string;
+  placeholder: string;
+  hint: string;
+  /** Save is only offered when this is true for the current text. */
+  isValid: (text: string) => boolean;
+  removeLabel: string;
+  onSave: (text: string) => void;
   onRemove: () => void;
-  /** Only offered for planned items that have been changed. */
+  /** Offered when the item has been changed from a default it can go back to. */
+  resetLabel?: string;
   onReset?: () => void;
   onClose: () => void;
 }
 
-/** Edit one shopping list line as text, e.g. "2 kg rice". Mount it when it should open. */
-export function EditItemModal({ row, onSave, onRemove, onReset, onClose }: Props) {
-  const [text, setText] = useState(entryToText(row));
-  const entry = entryFromText(text);
+/** Edit one list line as text, e.g. "2 kg rice". Mount it when it should open. */
+export function EditItemModal({
+  title,
+  initialText,
+  placeholder,
+  hint,
+  isValid,
+  removeLabel,
+  onSave,
+  onRemove,
+  resetLabel,
+  onReset,
+  onClose,
+}: Props) {
+  const [text, setText] = useState(initialText);
+  const valid = isValid(text);
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.sheet}>
-          <Text style={type.heading}>Edit item</Text>
+          <Text style={type.heading}>{title}</Text>
           <TextInput
             style={styles.input}
             value={text}
             onChangeText={setText}
             autoFocus
             selectTextOnFocus
-            placeholder="e.g. 2 kg rice"
+            placeholder={placeholder}
             returnKeyType="done"
-            onSubmitEditing={() => entry && onSave(entry)}
+            onSubmitEditing={() => valid && onSave(text)}
           />
-          <Text style={type.small}>Start with an amount if you like: 500 g flour, 3 eggs.</Text>
+          <Text style={type.small}>{hint}</Text>
           <View style={{ gap: spacing.sm }}>
-            <Button label="Save" onPress={() => entry && onSave(entry)} disabled={!entry} />
-            {onReset && <Button label="Reset to what the recipes need" variant="quiet" onPress={onReset} />}
+            <Button label="Save" onPress={() => onSave(text)} disabled={!valid} />
+            {onReset && resetLabel && <Button label={resetLabel} variant="quiet" onPress={onReset} />}
             <Button label="Cancel" variant="quiet" onPress={onClose} />
             <Pressable onPress={onRemove} style={styles.remove} accessibilityRole="button">
-              <Text style={styles.removeText}>{row.kind === 'extra' ? 'Delete item' : 'Remove from this list'}</Text>
+              <Text style={styles.removeText}>{removeLabel}</Text>
             </Pressable>
           </View>
         </View>

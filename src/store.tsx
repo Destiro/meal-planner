@@ -5,7 +5,7 @@ import { DEFAULT_SERVINGS, DEFAULT_SETTINGS, DATA_VERSION, migrate } from './mig
 import { copyWeek } from './planUtils';
 import { addDays, startOfWeek, toKey } from './dates';
 import { pruneWeeks } from './shoppingEdits';
-import { MealPlan, MealSlot, MealType, Recipe, Settings, ShoppingEdits } from './types';
+import { MealPlan, MealSlot, MealType, PantryItem, Recipe, Settings, ShoppingEdits } from './types';
 
 // The key predates versioning, so it keeps its "v1" name; the version lives inside the data.
 const STORAGE_KEY = 'mealplanner:v1';
@@ -37,6 +37,9 @@ interface StoreValue {
   recipes: Recipe[];
   plan: MealPlan;
   settings: Settings;
+  pantry: PantryItem[];
+  /** Change the pantry, e.g. with addToPantry from pantry.ts. */
+  updatePantry: (change: (pantry: PantryItem[]) => PantryItem[]) => void;
   shoppingEdits: ShoppingEdits;
   /** Change the hand edits using one of the reducers in shoppingEdits.ts. */
   updateShoppingEdits: (change: (edits: ShoppingEdits) => ShoppingEdits) => void;
@@ -58,6 +61,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [plan, setPlan] = useState<MealPlan>({});
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [shoppingEdits, setShoppingEdits] = useState<ShoppingEdits>({});
+  const [pantry, setPantry] = useState<PantryItem[]>([]);
   // Turned off if we couldn't read what's on the phone, so we never overwrite it with defaults.
   const canSave = useRef(true);
 
@@ -78,6 +82,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           setRecipes(data.recipes);
           setPlan(data.plan);
           setSettings(data.settings);
+          setPantry(data.pantry);
           setShoppingEdits(pruneWeeks(data.shoppingEdits, toKey(addDays(startOfWeek(new Date()), -7 * KEEP_EDIT_WEEKS))));
         } catch (e) {
           // Unreadable or from a newer app: keep a copy aside instead of losing it, then start fresh.
@@ -97,9 +102,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!ready || !canSave.current) return;
     AsyncStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ version: DATA_VERSION, recipes, plan, settings, shoppingEdits }),
+      JSON.stringify({ version: DATA_VERSION, recipes, plan, settings, shoppingEdits, pantry }),
     ).catch((e) => console.warn('Could not save data', e));
-  }, [ready, recipes, plan, settings, shoppingEdits]);
+  }, [ready, recipes, plan, settings, shoppingEdits, pantry]);
+
+  const updatePantry = useCallback((change: (pantry: PantryItem[]) => PantryItem[]) => {
+    setPantry(change);
+  }, []);
 
   const updateShoppingEdits = useCallback((change: (edits: ShoppingEdits) => ShoppingEdits) => {
     setShoppingEdits(change);
@@ -152,8 +161,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ ready, recipes, plan, settings, shoppingEdits, updateShoppingEdits, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots }),
-    [ready, recipes, plan, settings, shoppingEdits, updateShoppingEdits, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots],
+    () => ({ ready, recipes, plan, settings, shoppingEdits, updateShoppingEdits, pantry, updatePantry, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots }),
+    [ready, recipes, plan, settings, shoppingEdits, updateShoppingEdits, pantry, updatePantry, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

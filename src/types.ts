@@ -63,3 +63,13 @@ export interface WeekList {
 
 /** Keyed by the Monday of the week, YYYY-MM-DD. */
 export type ShoppingEdits = Record<string, WeekList>;
+
+/** Something you already have at home. */
+export interface PantryItem {
+  id: string;
+  name: string;
+  /** Amount in base units (g, ml). Left out for staples you always have, like salt. */
+  quantity?: number;
+  /** Empty string for plain counts. */
+  unit: string;
+}

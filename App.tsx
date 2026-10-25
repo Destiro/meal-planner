@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import PantryScreen from './src/screens/PantryScreen';
 import PlannerScreen from './src/screens/PlannerScreen';
 import RecipesScreen from './src/screens/RecipesScreen';
 import ShoppingScreen from './src/screens/ShoppingScreen';
@@ -35,6 +36,7 @@ function Root() {
       >
         <Tab.Screen name="Plan" component={PlannerScreen} />
         <Tab.Screen name="Recipes" component={RecipesScreen} />
+        <Tab.Screen name="Pantry" component={PantryScreen} />
         <Tab.Screen name="Shopping" component={ShoppingScreen} />
       </Tab.Navigator>
     </NavigationContainer>

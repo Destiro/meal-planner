@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
 import { EditItemModal } from '../components/EditItemModal';
 import { addDays, formatRange, startOfWeek, toKey } from '../dates';
+import { addToPantry, applyPantry } from '../pantry';
 import { AisleSection, buildShoppingList, formatItemAmount, formatShoppingText, groupByAisle } from '../shopping';
 import {
   addExtra,
@@ -12,6 +13,7 @@ import {
   editRow,
   EMPTY_WEEK,
   entryFromText,
+  entryToText,
   ListRow,
   removedCount,
   removeRow,
@@ -24,7 +26,8 @@ import { colors, radius, spacing, type } from '../theme';
 
 /** Builds a shopping list from the planned meals of a chosen week, which you can then edit by hand. */
 export default function ShoppingScreen() {
-  const { recipes, plan, settings, shoppingEdits, updateShoppingEdits, setHousehold, setGroupByAisle } = useStore();
+  const { recipes, plan, settings, shoppingEdits, updateShoppingEdits, pantry, updatePantry, setHousehold, setGroupByAisle } =
+    useStore();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [newItem, setNewItem] = useState('');
   const [editing, setEditing] = useState<ListRow | null>(null);
@@ -46,9 +49,11 @@ export default function ShoppingScreen() {
     [recipes, plan, weekStart, settings.household, settings.mealSlots],
   );
 
+  // What you already have comes off first, then your hand edits are applied on top.
+  const { items: needed, covered } = useMemo(() => applyPantry(planned, pantry), [planned, pantry]);
   const week = shoppingEdits[weekKey] ?? EMPTY_WEEK;
-  const rows = useMemo(() => applyEdits(planned, week), [planned, week]);
-  const removed = removedCount(planned, week);
+  const rows = useMemo(() => applyEdits(needed, week), [needed, week]);
+  const removed = removedCount(needed, week);
 
   const sections = useMemo<{ aisle: AisleSection['aisle'] | null; data: ListRow[] }[]>(
     () => (settings.groupByAisle ? groupByAisle(rows) : [{ aisle: null, data: rows }]),
@@ -59,6 +64,19 @@ export default function ShoppingScreen() {
   const remaining = rows.filter((row) => !week.checked[row.key]);
   const share = () =>
     Share.share({ message: formatShoppingText(remaining, `Shopping list, ${formatRange(weekStart)}`) }).catch(() => {});
+
+  // Bought items go into the pantry, which takes them off the list. Their ticks are cleared so they
+  // do not come back ticked if the pantry amount later drops.
+  const tickedPlanned = rows.filter((row) => row.kind === 'planned' && week.checked[row.key]);
+  const moveToPantry = () => {
+    updatePantry((current) =>
+      tickedPlanned.reduce(
+        (acc, row) => addToPantry(acc, { name: row.name, quantity: row.quantity, unit: row.unit }, newId()),
+        current,
+      ),
+    );
+    updateShoppingEdits((edits) => tickedPlanned.reduce((acc, row) => setChecked(acc, weekKey, row.key, false), edits));
+  };
 
   const addItem = () => {
     const entry = entryFromText(newItem);
@@ -119,6 +137,14 @@ export default function ShoppingScreen() {
       {rows.length > 0 && (
         <View style={styles.shareRow}>
           <Button label="Share list" variant="quiet" onPress={share} disabled={remaining.length === 0} />
+          {tickedPlanned.length > 0 && (
+            <Button label={`Move ${tickedPlanned.length} ticked to pantry`} variant="quiet" onPress={moveToPantry} />
+          )}
+          {covered > 0 && (
+            <Text style={type.small}>
+              Your pantry covers {covered} {covered === 1 ? 'item' : 'items'}.
+            </Text>
+          )}
         </View>
       )}
     </View>
@@ -211,10 +237,17 @@ export default function ShoppingScreen() {
         <EditItemModal
           // The row can be edited again straight after, so start each open from its current state.
           key={editing.key}
-          row={editing}
+          title="Edit item"
+          initialText={entryToText(editing)}
+          placeholder="e.g. 2 kg rice"
+          hint="Start with an amount if you like: 500 g flour, 3 eggs."
+          isValid={(text) => entryFromText(text) !== null}
+          removeLabel={editing.kind === 'extra' ? 'Delete item' : 'Remove from this list'}
+          resetLabel="Reset to what the recipes need"
           onClose={() => setEditing(null)}
-          onSave={(entry) => {
-            updateShoppingEdits((edits) => editRow(edits, weekKey, editing, entry));
+          onSave={(text) => {
+            const entry = entryFromText(text);
+            if (entry) updateShoppingEdits((edits) => editRow(edits, weekKey, editing, entry));
             setEditing(null);
           }}
           onRemove={() => {
@@ -248,7 +281,7 @@ const styles = StyleSheet.create({
   people: { minWidth: 24, textAlign: 'center' },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.md },
   addInput: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, padding: spacing.md, fontSize: 15 },
-  shareRow: { paddingBottom: spacing.md },
+  shareRow: { paddingBottom: spacing.md, gap: spacing.sm },
   aisle: { fontSize: 13, fontWeight: '700', color: colors.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, paddingTop: spacing.md },
   list: { padding: spacing.lg, paddingTop: 0 },
   row: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line },
