@@ -1,4 +1,4 @@
-import { addToPantry, applyPantry, pantryEntryFromText, pantryToText, sortPantry } from '../pantry';
+import { addToPantry, applyPantry, applyPantryActions, pantryEntryFromText, pantryToText, sortPantry } from '../pantry';
 import { ShoppingItem } from '../shopping';
 import { PantryItem } from '../types';
 
@@ -75,5 +75,35 @@ describe('sortPantry', () => {
     const pantry = [have('rice', 1, 'g'), have('apple', 1)];
     expect(sortPantry(pantry).map((p) => p.name)).toEqual(['apple', 'rice']);
     expect(pantry[0].name).toBe('rice');
+  });
+});
+
+describe('applyPantryActions', () => {
+  let n = 0;
+  const makeId = () => `id${++n}`;
+
+  it('adds items, merging amounts with what is already there', () => {
+    const start = [have('rice', 500, 'g', 'r')];
+    const result = applyPantryActions(start, [{ action: 'add', text: '250 g rice' }, { action: 'add', text: '6 eggs' }], makeId);
+    expect(result.added).toBe(2);
+    expect(result.pantry).toEqual([
+      { id: 'r', name: 'rice', quantity: 750, unit: 'g' },
+      { id: expect.any(String), name: 'eggs', quantity: 6, unit: '' },
+    ]);
+    expect(start[0].quantity).toBe(500);
+  });
+
+  it('removes whole items by name, treating plurals alike, and counts only real removals', () => {
+    const result = applyPantryActions(
+      [have('tomato', 2), have('milk', 500, 'ml')],
+      [{ action: 'remove', text: 'Tomatoes' }, { action: 'remove', text: 'butter' }],
+      makeId,
+    );
+    expect(result.pantry.map((p) => p.name)).toEqual(['milk']);
+    expect(result).toMatchObject({ added: 0, removed: 1 });
+  });
+
+  it('ignores lines it cannot read', () => {
+    expect(applyPantryActions([], [{ action: 'add', text: '   ' }], makeId)).toEqual({ pantry: [], added: 0, removed: 0 });
   });
 });

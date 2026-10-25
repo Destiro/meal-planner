@@ -34,7 +34,15 @@
           "microphonePermission": false,
           "cameraPermission": false
         }
-      ]
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Meal Planner to use the microphone so you can talk to the assistant.",
+          "recordAudioAndroid": true
+        }
+      ],
+      "expo-asset"
     ],
     "extra": {
       "eas": {
