@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { copyWeek } from './planUtils';
 import { MealPlan, MealType, Recipe } from './types';
 
 const STORAGE_KEY = 'mealplanner:v1';
@@ -19,6 +20,7 @@ interface StoreValue {
   addRecipe: (name: string, ingredients: string[]) => void;
   deleteRecipe: (id: string) => void;
   setMeal: (dateKey: string, meal: MealType, recipeId: string | null) => void;
+  copyWeekPlan: (from: Date, to: Date) => void;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -83,9 +85,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const copyWeekPlan = useCallback((from: Date, to: Date) => {
+    setPlan((prev) => copyWeek(prev, from, to));
+  }, []);
+
   const value = useMemo(
-    () => ({ ready, recipes, plan, addRecipe, deleteRecipe, setMeal }),
-    [ready, recipes, plan, addRecipe, deleteRecipe, setMeal],
+    () => ({ ready, recipes, plan, addRecipe, deleteRecipe, setMeal, copyWeekPlan }),
+    [ready, recipes, plan, addRecipe, deleteRecipe, setMeal, copyWeekPlan],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

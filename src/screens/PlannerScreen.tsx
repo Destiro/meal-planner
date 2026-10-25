@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DayMeals } from '../components/DayMeals';
 import { MonthCalendar } from '../components/MonthCalendar';
@@ -16,6 +16,8 @@ import {
   toKey,
   weekDays,
 } from '../dates';
+import { weekHasMeals } from '../planUtils';
+import { useStore } from '../store';
 import { colors, radius, spacing, type } from '../theme';
 
 type Mode = 'week' | 'month';
@@ -26,6 +28,18 @@ export default function PlannerScreen() {
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selected, setSelected] = useState(() => new Date());
   const [picking, setPicking] = useState<Slot | null>(null);
+  const { plan, copyWeekPlan } = useStore();
+
+  const previousWeek = addDays(weekStart, -7);
+  const canCopy = weekHasMeals(plan, previousWeek);
+  const copyLastWeek = () => {
+    const doCopy = () => copyWeekPlan(previousWeek, weekStart);
+    if (!weekHasMeals(plan, weekStart)) return doCopy();
+    Alert.alert('Replace this week?', "Meals already planned this week will be replaced with last week's.", [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Replace', style: 'destructive', onPress: doCopy },
+    ]);
+  };
 
   const todayKey = toKey(new Date());
 
@@ -85,6 +99,11 @@ export default function PlannerScreen() {
           <Text style={styles.chipText}>{mode === 'week' ? 'Week' : 'Month'}</Text>
           <Ionicons name="swap-horizontal" size={16} color={colors.inkSoft} />
         </Pressable>
+        {mode === 'week' && (
+          <Pressable onPress={copyLastWeek} disabled={!canCopy} hitSlop={8} style={!canCopy && { opacity: 0.4 }}>
+            <Text style={styles.today}>Copy last week</Text>
+          </Pressable>
+        )}
         <Pressable onPress={goToday} hitSlop={8}>
           <Text style={styles.today}>Today</Text>
         </Pressable>
