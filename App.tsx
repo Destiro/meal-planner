@@ -1,5 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
+import { createBottomTabNavigator, BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
+import { PlatformPressable } from '@react-navigation/elements';
 import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
@@ -13,6 +15,19 @@ import { colors } from './src/theme';
 
 const Tab = createBottomTabNavigator();
 
+const TAB_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
+  Plan: 'calendar-outline',
+  Recipes: 'book-outline',
+  Pantry: 'basket-outline',
+  Shopping: 'cart-outline',
+};
+
+// React Navigation draws a round, unclipped ripple on Android that spills out of the button and under
+// the system navigation bar. A bounded ripple stays inside the tab.
+const TabButton = (props: BottomTabBarButtonProps) => (
+  <PlatformPressable {...props} android_ripple={{ borderless: false, color: colors.accentSoft }} />
+);
+
 function Root() {
   const { ready } = useStore();
   if (!ready) {
@@ -25,14 +40,15 @@ function Root() {
   return (
     <NavigationContainer>
       <Tab.Navigator
-        screenOptions={{
+        screenOptions={({ route }) => ({
           headerShown: false,
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.inkSoft,
-          tabBarIcon: () => null,
-          tabBarLabelStyle: { fontSize: 14, fontWeight: '600' },
+          tabBarIcon: ({ color, size }) => <Ionicons name={TAB_ICONS[route.name]} size={size} color={color} />,
+          tabBarButton: TabButton,
+          tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
           tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.line },
-        }}
+        })}
       >
         <Tab.Screen name="Plan" component={PlannerScreen} />
         <Tab.Screen name="Recipes" component={RecipesScreen} />
