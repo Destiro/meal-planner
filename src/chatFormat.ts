@@ -10,11 +10,18 @@ export interface PlanEntry {
   recipe: string;
 }
 
-/** A piece of an assistant reply: plain text, a recipe to save, or a meal plan to apply. */
+export interface PantryAction {
+  action: 'add' | 'remove';
+  /** What to add or remove, as typed, e.g. "500 g rice". */
+  text: string;
+}
+
+/** A piece of an assistant reply: plain text, a recipe to save, a meal plan or pantry changes to apply. */
 export type Segment =
   | { kind: 'text'; text: string }
   | { kind: 'recipe'; recipe: RecipeInput }
-  | { kind: 'plan'; entries: PlanEntry[] };
+  | { kind: 'plan'; entries: PlanEntry[] }
+  | { kind: 'pantry'; actions: PantryAction[] };
 
 /** Drops the markdown the model sometimes adds even though we ask for plain text. */
 const plain = (line: string) =>
@@ -83,7 +90,18 @@ export function parsePlanBlock(block: string): PlanEntry[] {
   });
 }
 
-const BLOCK = /\[\[(RECIPE|PLAN)\]\]([\s\S]*?)(?:\[\[\/\1\]\]|$)/gi;
+/** Reads the "Add | 500 g rice" and "Remove | milk" lines between [[PANTRY]] markers. */
+export function parsePantryBlock(block: string): PantryAction[] {
+  return block.split('\n').flatMap((rawLine): PantryAction[] => {
+    const [verb, ...rest] = stripBullet(plain(rawLine)).split('|');
+    const text = rest.join('|').trim();
+    const action = verb?.trim().toLowerCase();
+    if (!text || (action !== 'add' && action !== 'remove')) return [];
+    return [{ action, text }];
+  });
+}
+
+const BLOCK = /\[\[(RECIPE|PLAN|PANTRY)\]\]([\s\S]*?)(?:\[\[\/\1\]\]|$)/gi;
 
 /**
  * Splits a reply into text, recipes and plans. A block that can't be read is kept as plain text so
@@ -109,6 +127,10 @@ export function parseReply(reply: string): Segment[] {
     if (match[1].toUpperCase() === 'RECIPE') {
       const recipe = parseRecipeBlock(match[2]);
       if (recipe) segments.push({ kind: 'recipe', recipe });
+      else pushText(match[2]);
+    } else if (match[1].toUpperCase() === 'PANTRY') {
+      const actions = parsePantryBlock(match[2]);
+      if (actions.length) segments.push({ kind: 'pantry', actions });
       else pushText(match[2]);
     } else {
       const entries = parsePlanBlock(match[2]);

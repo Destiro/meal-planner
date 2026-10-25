@@ -1,4 +1,4 @@
-import { buildSystemPrompt, parseChatRequest } from '../../worker/src/chat';
+import { buildSystemPrompt, parseChatRequest, parseTranscribeRequest } from '../../worker/src/chat';
 
 const user = (content: string) => ({ role: 'user', content });
 
@@ -65,5 +65,28 @@ describe('buildSystemPrompt', () => {
     expect(empty).toContain('(none yet)');
     expect(empty).toContain('(empty)');
     expect(empty).toContain('3 people');
+  });
+});
+
+describe('parseTranscribeRequest', () => {
+  const audio = 'QUJD'.repeat(50);
+
+  it('accepts base64 audio and strips whitespace', () => {
+    expect(parseTranscribeRequest({ audio: `${audio}\n` })).toEqual({ audio });
+  });
+
+  it('rejects missing, tiny, non-base64 and oversized recordings', () => {
+    for (const body of [null, {}, { audio: 5 }, { audio: 'QUJD' }, { audio: `${audio}!!!` }]) {
+      expect(parseTranscribeRequest(body)).toHaveProperty('error');
+    }
+    expect(parseTranscribeRequest({ audio: 'A'.repeat(2_600_000) })).toHaveProperty('error');
+  });
+});
+
+describe('pantry instructions', () => {
+  it('tells the assistant to use the pantry block and not to claim it changed anything', () => {
+    const prompt = buildSystemPrompt({ pantry: [], recipes: [], slots: [], household: 2 });
+    expect(prompt).toContain('[[PANTRY]]');
+    expect(prompt).toContain('NEVER say you have added');
   });
 });

@@ -1,4 +1,4 @@
-import { ApiError, chatOnline, randomOnline, searchOnline } from '../api';
+import { ApiError, chatOnline, randomOnline, searchOnline, transcribeOnline } from '../api';
 
 const reply = (status: number, body: unknown) =>
   Promise.resolve({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) } as Response);
@@ -73,5 +73,20 @@ describe('chatOnline', () => {
     await expect(chatOnline([{ role: 'user', content: 'hi' }], context)).rejects.toThrow('nothing to say');
     fetchMock.mockReturnValue(reply(200, {}));
     await expect(chatOnline([{ role: 'user', content: 'hi' }], context)).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+describe('transcribeOnline', () => {
+  it('posts the audio and returns the trimmed text', async () => {
+    fetchMock.mockReturnValue(reply(200, { text: '  add 500 grams of rice  ' }));
+    expect(await transcribeOnline('QUJD')).toBe('add 500 grams of rice');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(url).pathname).toBe('/transcribe');
+    expect(JSON.parse(init.body)).toEqual({ audio: 'QUJD' });
+  });
+
+  it('shows the worker message when it could not hear anything', async () => {
+    fetchMock.mockReturnValue(reply(422, { error: 'I could not hear anything. Try again a bit closer to the microphone.' }));
+    await expect(transcribeOnline('QUJD')).rejects.toThrow('closer to the microphone');
   });
 });

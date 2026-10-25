@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,12 +15,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ApiError, chatOnline } from '../api';
 import { Button } from '../components/Button';
 import { RecipeFormModal } from '../components/RecipeFormModal';
+import { RecipePreviewModal } from '../components/RecipePreviewModal';
 import { loadChat, saveChat, StoredMessage } from '../chatHistory';
-import { parseReply, PlanEntry, planToMeals, Segment } from '../chatFormat';
+import { PantryAction, parseReply, PlanEntry, planToMeals, Segment } from '../chatFormat';
+import { formatDuration } from '../audio';
 import { addDays, startOfWeek } from '../dates';
 import { formatIngredient } from '../ingredients';
-import { pantryToText } from '../pantry';
+import { applyPantryActions, pantryToText } from '../pantry';
 import { newId, RecipeInput, useStore } from '../store';
+import { useVoiceInput } from '../useVoiceInput';
 import { colors, radius, spacing, type } from '../theme';
 
 const SUGGESTIONS = [
@@ -30,13 +34,14 @@ const SUGGESTIONS = [
 
 /** A cooking assistant that knows your recipes and pantry, and can suggest recipes and meal plans. */
 export default function ChatScreen() {
-  const { recipes, pantry, settings, addRecipe, setMeal } = useStore();
+  const { recipes, pantry, settings, addRecipe, setMeal, updatePantry } = useStore();
   const [messages, setMessages] = useState<StoredMessage[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<RecipeInput | null>(null);
+  const [viewing, setViewing] = useState<RecipeInput | null>(null);
   const listRef = useRef<FlatList<StoredMessage>>(null);
 
   useEffect(() => {
@@ -92,6 +97,20 @@ export default function ChatScreen() {
     setError(null);
   };
 
+  // Talking sends straight away. The assistant only ever suggests changes, so a misheard word can't
+  // alter anything until you tap a button on a card.
+  const voice = useVoiceInput(send);
+
+  const applyPantry = (actions: PantryAction[]) => {
+    const result = applyPantryActions(pantry, actions, newId);
+    updatePantry(() => result.pantry);
+    const parts = [
+      result.added ? `added ${result.added} ${result.added === 1 ? 'item' : 'items'}` : null,
+      result.removed ? `removed ${result.removed} ${result.removed === 1 ? 'item' : 'items'}` : null,
+    ].filter(Boolean);
+    Alert.alert(parts.length ? 'Pantry updated' : 'Nothing changed', parts.length ? `You've ${parts.join(' and ')}.` : 'Those items are not in your pantry.');
+  };
+
   const addPlan = (entries: PlanEntry[], weekOffset: 0 | 1) => {
     const weekStart = addDays(startOfWeek(new Date()), 7 * weekOffset);
     const { meals, skipped } = planToMeals(entries, recipes, settings.mealSlots, weekStart);
@@ -139,7 +158,13 @@ export default function ChatScreen() {
                 <Text style={styles.userText}>{item.content}</Text>
               </View>
             ) : (
-              <AssistantMessage content={item.content} onSaveRecipe={setDraft} onAddPlan={addPlan} />
+              <AssistantMessage
+                content={item.content}
+                onViewRecipe={setViewing}
+                onSaveRecipe={setDraft}
+                onAddPlan={addPlan}
+                onApplyPantry={applyPantry}
+              />
             )
           }
           ListFooterComponent={
@@ -162,7 +187,24 @@ export default function ChatScreen() {
           }
         />
 
+        {(voice.recording || voice.transcribing) && (
+          <View style={styles.voiceBar}>
+            {voice.transcribing ? <ActivityIndicator color={colors.accent} /> : <View style={styles.recDot} />}
+            <Text style={type.body}>
+              {voice.transcribing ? 'Listening to what you said…' : `Recording ${formatDuration(voice.durationMillis)}. Tap the mic to send.`}
+            </Text>
+          </View>
+        )}
         <View style={styles.inputRow}>
+          <Pressable
+            onPress={voice.toggle}
+            disabled={voice.transcribing || sending}
+            accessibilityRole="button"
+            accessibilityLabel={voice.recording ? 'Stop recording and send' : 'Talk to the assistant'}
+            style={[styles.mic, voice.recording && styles.micActive, (voice.transcribing || sending) && { opacity: 0.4 }]}
+          >
+            <Ionicons name={voice.recording ? 'stop' : 'mic-outline'} size={22} color={voice.recording ? '#fff' : colors.accent} />
+          </Pressable>
           <TextInput
             style={styles.input}
             value={input}
@@ -175,6 +217,17 @@ export default function ChatScreen() {
           <Button label="Send" onPress={() => send(input)} disabled={!input.trim() || sending} />
         </View>
       </KeyboardAvoidingView>
+
+      {viewing && (
+        <RecipePreviewModal
+          recipe={viewing}
+          onClose={() => setViewing(null)}
+          onSave={() => {
+            setDraft(viewing);
+            setViewing(null);
+          }}
+        />
+      )}
 
       {draft && (
         <RecipeFormModal
@@ -194,18 +247,29 @@ export default function ChatScreen() {
 
 function AssistantMessage({
   content,
+  onViewRecipe,
   onSaveRecipe,
   onAddPlan,
+  onApplyPantry,
 }: {
   content: string;
+  onViewRecipe: (recipe: RecipeInput) => void;
   onSaveRecipe: (recipe: RecipeInput) => void;
   onAddPlan: (entries: PlanEntry[], weekOffset: 0 | 1) => void;
+  onApplyPantry: (actions: PantryAction[]) => void;
 }) {
   const segments = useMemo(() => parseReply(content), [content]);
   return (
     <View style={styles.assistant}>
       {segments.map((segment, i) => (
-        <SegmentView key={i} segment={segment} onSaveRecipe={onSaveRecipe} onAddPlan={onAddPlan} />
+        <SegmentView
+          key={i}
+          segment={segment}
+          onViewRecipe={onViewRecipe}
+          onSaveRecipe={onSaveRecipe}
+          onAddPlan={onAddPlan}
+          onApplyPantry={onApplyPantry}
+        />
       ))}
     </View>
   );
@@ -213,12 +277,16 @@ function AssistantMessage({
 
 function SegmentView({
   segment,
+  onViewRecipe,
   onSaveRecipe,
   onAddPlan,
+  onApplyPantry,
 }: {
   segment: Segment;
+  onViewRecipe: (recipe: RecipeInput) => void;
   onSaveRecipe: (recipe: RecipeInput) => void;
   onAddPlan: (entries: PlanEntry[], weekOffset: 0 | 1) => void;
+  onApplyPantry: (actions: PantryAction[]) => void;
 }) {
   if (segment.kind === 'text') {
     return (
@@ -236,7 +304,27 @@ function SegmentView({
           Serves {recipe.servings} · {recipe.ingredients.length} ingredients
         </Text>
         <Text style={type.small}>{recipe.ingredients.map(formatIngredient).join(', ')}</Text>
-        <Button label="Save to recipes" onPress={() => onSaveRecipe(recipe)} />
+        <View style={styles.planButtons}>
+          <View style={styles.flex}>
+            <Button label="View recipe" variant="quiet" onPress={() => onViewRecipe(recipe)} />
+          </View>
+          <View style={styles.flex}>
+            <Button label="Save" onPress={() => onSaveRecipe(recipe)} />
+          </View>
+        </View>
+      </View>
+    );
+  }
+  if (segment.kind === 'pantry') {
+    return (
+      <View style={styles.card}>
+        <Text style={type.heading}>Pantry changes</Text>
+        {segment.actions.map((action, i) => (
+          <Text key={i} style={type.body}>
+            {action.action === 'add' ? 'Add' : 'Remove'}: {action.text}
+          </Text>
+        ))}
+        <Button label="Update my pantry" onPress={() => onApplyPantry(segment.actions)} />
       </View>
     );
   }
@@ -275,6 +363,10 @@ const styles = StyleSheet.create({
   assistant: { gap: spacing.sm, alignItems: 'flex-start' },
   bot: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
   card: { alignSelf: 'stretch', backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.accent, padding: spacing.lg, gap: spacing.sm },
+  voiceBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.accentSoft },
+  recDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.danger },
+  mic: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accentSoft },
+  micActive: { backgroundColor: colors.danger },
   planButtons: { flexDirection: 'row', gap: spacing.sm },
   thinking: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   errorBox: { gap: spacing.sm },

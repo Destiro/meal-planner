@@ -1,4 +1,4 @@
-import { parsePlanBlock, parseRecipeBlock, parseReply, planToMeals } from '../chatFormat';
+import { parsePantryBlock, parsePlanBlock, parseRecipeBlock, parseReply, planToMeals } from '../chatFormat';
 import { Recipe } from '../types';
 
 const SOUP = `[[RECIPE]]
@@ -123,5 +123,21 @@ describe('planToMeals', () => {
     const { meals, skipped } = planToMeals(entries, recipes, slots, monday);
     expect(meals).toEqual([]);
     expect(skipped).toEqual(entries);
+  });
+});
+
+describe('pantry blocks', () => {
+  it('reads Add and Remove lines and ignores anything else', () => {
+    expect(parsePantryBlock('Add | 500 g rice\n- add | 6 eggs\nRemove | milk\nBuy | bread\nAdd |\nnonsense')).toEqual([
+      { action: 'add', text: '500 g rice' },
+      { action: 'add', text: '6 eggs' },
+      { action: 'remove', text: 'milk' },
+    ]);
+  });
+
+  it('becomes a pantry segment in a reply', () => {
+    const segments = parseReply('Done!\n[[PANTRY]]\nAdd | 500 g rice\n[[/PANTRY]]');
+    expect(segments.map((s) => s.kind)).toEqual(['text', 'pantry']);
+    expect(segments[1]).toEqual({ kind: 'pantry', actions: [{ action: 'add', text: '500 g rice' }] });
   });
 });

@@ -3,6 +3,7 @@
  *
  *   GET /recipes/search?q=pasta&number=10&offset=0   search, with ingredients and instructions
  *   GET /recipes/random?number=5                     random recipes for inspiration
+ *   POST /transcribe                                 speech to text for the chat microphone (Workers AI)
  *   POST /chat                                       cooking assistant (Cloudflare Workers AI)
  *   GET /health                                      "ok"
  *
@@ -10,7 +11,7 @@
  * `ingredients` and `steps`. Errors are { error: "message" }.
  */
 
-import { buildSystemPrompt, parseChatRequest } from './chat';
+import { buildSystemPrompt, parseChatRequest, parseTranscribeRequest } from './chat';
 
 interface Env {
   /** Cloudflare Workers AI, bound in wrangler.jsonc. */
@@ -26,6 +27,9 @@ const API = 'https://api.spoonacular.com';
 const CHAT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const CHAT_MAX_TOKENS = 900;
 const MAX_BODY_BYTES = 40_000;
+
+const TRANSCRIBE_MODEL = '@cf/openai/whisper-large-v3-turbo';
+const MAX_AUDIO_BODY_BYTES = 3_000_000;
 
 // Spoonacular's terms allow caching results for at most one hour.
 const CACHE_SECONDS = 3600;
@@ -142,6 +146,35 @@ async function random(url: URL, env: Env): Promise<Response> {
   return json({ recipes: (data.recipes ?? []).map(shapeRecipe) });
 }
 
+/** Turns a short voice recording (base64) into text, so the person can talk to the assistant. */
+async function transcribe(request: Request, env: Env): Promise<Response> {
+  const raw = await request.text();
+  if (raw.length > MAX_AUDIO_BODY_BYTES) return json({ error: 'That recording is too long. Keep it under a minute.' }, 413);
+
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return json({ error: 'Send a JSON body.' }, 400);
+  }
+  const parsed = parseTranscribeRequest(body);
+  if ('error' in parsed) return json({ error: parsed.error }, 400);
+
+  try {
+    const result = await env.AI.run(TRANSCRIBE_MODEL, { audio: parsed.audio, task: 'transcribe' });
+    const text = typeof result === 'object' && result !== null && 'text' in result ? String(result.text ?? '').trim() : '';
+    if (!text) return json({ error: 'I could not hear anything. Try again a bit closer to the microphone.' }, 422);
+    return json({ text });
+  } catch (e) {
+    console.error('Transcription failed', e);
+    const message = e instanceof Error ? e.message : '';
+    if (/neuron|allocation|quota|limit/i.test(message)) {
+      return json({ error: 'The assistant has reached its daily limit. Try again tomorrow.' }, 429);
+    }
+    return json({ error: 'Could not understand that recording. Try again, or type instead.' }, 502);
+  }
+}
+
 async function chat(request: Request, env: Env): Promise<Response> {
   const raw = await request.text();
   if (raw.length > MAX_BODY_BYTES) return json({ error: 'That conversation is too long. Start a new chat.' }, 413);
@@ -178,11 +211,13 @@ async function chat(request: Request, env: Env): Promise<Response> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const expected = url.pathname === '/chat' ? 'POST' : 'GET';
+    const expected = url.pathname === '/chat' || url.pathname === '/transcribe' ? 'POST' : 'GET';
     if (request.method !== expected) return json({ error: 'Method not allowed.' }, 405);
 
     try {
       switch (url.pathname) {
+        case '/transcribe':
+          return await transcribe(request, env);
         case '/chat':
           return await chat(request, env);
         case '/health':

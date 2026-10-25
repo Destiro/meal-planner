@@ -68,3 +68,32 @@ export function applyPantry(items: ShoppingItem[], pantry: PantryItem[]): { item
   }
   return { items: remaining, covered };
 }
+
+/**
+ * Applies pantry changes suggested by the assistant. "Add" lines go through addToPantry (so amounts add up),
+ * "Remove" lines take the whole item out, matching names like tomato and Tomatoes as the same thing.
+ * Lines that can't be read are ignored. `added` and `removed` count what actually changed.
+ */
+export function applyPantryActions(
+  pantry: PantryItem[],
+  actions: { action: 'add' | 'remove'; text: string }[],
+  makeId: () => string,
+): { pantry: PantryItem[]; added: number; removed: number } {
+  let result = pantry;
+  let added = 0;
+  let removed = 0;
+  for (const { action, text } of actions) {
+    const entry = pantryEntryFromText(text);
+    if (!entry) continue;
+    if (action === 'add') {
+      result = addToPantry(result, entry, makeId());
+      added++;
+    } else {
+      const key = matchKey(entry.name);
+      const kept = result.filter((p) => matchKey(p.name) !== key);
+      if (kept.length !== result.length) removed++;
+      result = kept;
+    }
+  }
+  return { pantry: result, added, removed };
+}

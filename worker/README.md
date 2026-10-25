@@ -6,6 +6,7 @@ A tiny proxy between the app and Spoonacular, so the API key stays on Cloudflare
 |---|---|
 | `GET /recipes/search?q=pasta&number=10&offset=0` | Search, returning ingredients and instructions in one call |
 | `GET /recipes/random?number=5` | Random recipes for inspiration |
+| `POST /transcribe` | Speech to text for the chat microphone. Takes `{ audio }` (base64) and returns `{ text }` |
 | `POST /chat` | The cooking assistant. Takes `{ messages, context }` and returns `{ reply }` |
 | `GET /health` | Returns `ok` |
 

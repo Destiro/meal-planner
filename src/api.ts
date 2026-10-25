@@ -77,3 +77,15 @@ export async function chatOnline(messages: ChatTurn[], context: ChatContext): Pr
   if (typeof reply !== 'string' || !reply.trim()) throw new ApiError('The assistant had nothing to say. Try again.');
   return reply;
 }
+
+/** Turns a voice recording (base64 audio) into text. */
+export async function transcribeOnline(audioBase64: string): Promise<string> {
+  const body = await callApi(
+    '/transcribe',
+    { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ audio: audioBase64 }) },
+    CHAT_TIMEOUT_MS,
+  );
+  const text = (body as { text?: unknown } | null)?.text;
+  if (typeof text !== 'string' || !text.trim()) throw new ApiError('I could not hear anything. Try again.');
+  return text.trim();
+}
