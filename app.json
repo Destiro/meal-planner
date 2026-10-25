@@ -17,7 +17,10 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.example.mealplanner"
+      "package": "com.destiro.mealplanner",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -29,6 +32,12 @@
       "expo-status-bar",
       "expo-font",
       "expo-image-picker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "863e536f-a2ed-4fef-95ce-5e10096e0c97"
+      }
+    },
+    "owner": "destiro"
   }
 }
