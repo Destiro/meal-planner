@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
-import { Pressable, SectionList, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, SectionList, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
 import { EditItemModal } from '../components/EditItemModal';
@@ -10,6 +10,7 @@ import { canDecrease, formatQuantityLabel, nextQuantity } from '../quantity';
 import { AisleSection, formatShoppingText, groupByAisle } from '../shopping';
 import {
   applyShoppingActions,
+  clearWeek,
   editRow,
   EMPTY_WEEK,
   entryFromText,
@@ -68,6 +69,17 @@ export default function ShoppingScreen() {
     );
     updateShoppingEdits((edits) => tickedPlanned.reduce((acc, row) => setChecked(acc, weekKey, row.key, false), edits));
   };
+
+  const clearList = () =>
+    Alert.alert(
+      'Clear this list?',
+      `This removes all ${rows.length} ${rows.length === 1 ? 'item' : 'items'} from ${label.toLowerCase()}, ${formatRange(weekStart)}. ` +
+        'Items from your recipes can be brought back with "Restore removed items". Items you added yourself cannot.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Clear list', style: 'destructive', onPress: () => updateShoppingEdits((edits) => clearWeek(edits, weekKey, rows)) },
+      ],
+    );
 
   const addItem = () => {
     if (!entryFromText(newItem)) return;
@@ -137,6 +149,7 @@ export default function ShoppingScreen() {
           {tickedPlanned.length > 0 && (
             <Button label={`Move ${tickedPlanned.length} ticked to pantry`} variant="quiet" onPress={moveToPantry} />
           )}
+          <Button label="Clear list" variant="quiet" onPress={clearList} />
           {covered > 0 && (
             <Text style={type.small}>
               Your pantry covers {covered} {covered === 1 ? 'item' : 'items'}.
