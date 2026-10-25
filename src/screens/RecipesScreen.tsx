@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, FlatList, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
 import { RecipeFormModal } from '../components/RecipeFormModal';
 import { formatIngredient } from '../ingredients';
 import { deletePhoto } from '../photos';
+import { searchRecipes } from '../recipeFields';
 import { useStore } from '../store';
 import { colors, radius, spacing, type } from '../theme';
 import { Recipe } from '../types';
@@ -14,6 +15,7 @@ export default function RecipesScreen() {
   // undefined: form closed. null: adding a new recipe. Recipe: editing it.
   const [editing, setEditing] = useState<Recipe | null | undefined>(undefined);
   const [tag, setTag] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   const allTags = useMemo(
     () => [...new Set(recipes.flatMap((r) => r.tags ?? []))].sort(),
@@ -21,7 +23,7 @@ export default function RecipesScreen() {
   );
   // If the last recipe with the chosen tag is deleted or retagged, show everything again.
   const activeTag = tag && allTags.includes(tag) ? tag : null;
-  const shown = activeTag ? recipes.filter((r) => r.tags?.includes(activeTag)) : recipes;
+  const shown = useMemo(() => searchRecipes(recipes, query, activeTag), [recipes, query, activeTag]);
 
   const confirmDelete = (recipe: Recipe) =>
     Alert.alert(`Delete "${recipe.name}"?`, 'It will also be removed from your meal plan.', [
@@ -43,6 +45,21 @@ export default function RecipesScreen() {
         <Text style={type.title}>Recipes</Text>
         <Button label="Add recipe" onPress={() => setEditing(null)} />
       </View>
+
+      {recipes.length > 0 && (
+        <View style={styles.search}>
+          <TextInput
+            style={styles.searchInput}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by name, ingredient or tag"
+            returnKeyType="search"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            accessibilityLabel="Search recipes"
+          />
+        </View>
+      )}
 
       {allTags.length > 0 && (
         <View>
@@ -66,7 +83,12 @@ export default function RecipesScreen() {
         data={shown}
         keyExtractor={(r) => r.id}
         contentContainerStyle={styles.list}
-        ListEmptyComponent={<Text style={type.small}>No recipes yet. Add your first one.</Text>}
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={
+          <Text style={type.small}>
+            {recipes.length === 0 ? 'No recipes yet. Add your first one.' : 'No recipes match your search.'}
+          </Text>
+        }
         renderItem={({ item }) => (
           <Pressable style={styles.card} onPress={() => setEditing(item)} accessibilityHint="Opens the recipe to edit">
             {item.photo ? <Image source={{ uri: item.photo }} style={styles.photo} /> : null}
@@ -107,6 +129,8 @@ export default function RecipesScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg },
+  search: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  searchInput: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, padding: spacing.md, fontSize: 15 },
   chips: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
   chip: { paddingVertical: 6, paddingHorizontal: spacing.md, borderRadius: 999, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
   chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
