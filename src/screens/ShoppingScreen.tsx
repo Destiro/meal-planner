@@ -81,7 +81,10 @@ export default function ShoppingScreen() {
   const header = (
     <View>
       <View style={styles.household}>
-        <Text style={type.body}>Cooking for</Text>
+        <View style={styles.householdText}>
+          <Text style={type.body}>Cooking for</Text>
+          <Text style={type.small}>Scales recipe amounts to this many people</Text>
+        </View>
         <View style={styles.stepper}>
           <Pressable
             onPress={() => setHousehold(settings.household - 1)}
@@ -91,9 +94,10 @@ export default function ShoppingScreen() {
           >
             <Text style={styles.stepText}>−</Text>
           </Pressable>
-          <Text style={[type.heading, styles.people]} accessibilityLabel={`${settings.household} people`}>
-            {settings.household}
-          </Text>
+          <View style={styles.people} accessibilityLabel={`${settings.household} ${settings.household === 1 ? 'person' : 'people'}`}>
+            <Text style={type.heading}>{settings.household}</Text>
+            <Text style={type.small}>{settings.household === 1 ? 'person' : 'people'}</Text>
+          </View>
           <Pressable
             onPress={() => setHousehold(settings.household + 1)}
             hitSlop={8}
@@ -302,7 +306,8 @@ const styles = StyleSheet.create({
   stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   stepButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
   stepText: { fontSize: 22, color: colors.accent, fontWeight: '600', lineHeight: 26 },
-  people: { minWidth: 24, textAlign: 'center' },
+  householdText: { flex: 1, paddingRight: spacing.md },
+  people: { minWidth: 48, alignItems: 'center' },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.md },
   addInput: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, padding: spacing.md, fontSize: 15 },
   shareRow: { paddingBottom: spacing.md, gap: spacing.sm },
