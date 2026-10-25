@@ -17,10 +17,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.destiro.mealplanner",
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "package": "com.destiro.mealplanner"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -31,7 +28,13 @@
     "plugins": [
       "expo-status-bar",
       "expo-font",
-      "expo-image-picker"
+      [
+        "expo-image-picker",
+        {
+          "microphonePermission": false,
+          "cameraPermission": false
+        }
+      ]
     ],
     "extra": {
       "eas": {
