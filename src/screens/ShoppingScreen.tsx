@@ -20,6 +20,8 @@ import {
   removeRow,
   resetRow,
   restoreRemoved,
+  rowCaption,
+  rowOrigin,
   setChecked,
 } from '../shoppingEdits';
 import { shoppingRows } from '../shoppingList';
@@ -144,6 +146,19 @@ export default function ShoppingScreen() {
       </View>
 
       {rows.length > 0 && (
+        <View style={styles.legend} accessibilityLabel="Green lines come from your recipes and change with Cooking for. Amber lines you added yourself and never change.">
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: colors.accent }]} />
+            <Text style={type.small}>From recipes (scales with people)</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: colors.own }]} />
+            <Text style={type.small}>Added by you (never scaled)</Text>
+          </View>
+        </View>
+      )}
+
+      {rows.length > 0 && (
         <View style={styles.shareRow}>
           <Button label="Share list" variant="quiet" onPress={share} disabled={remaining.length === 0} />
           {tickedPlanned.length > 0 && (
@@ -226,7 +241,7 @@ export default function ShoppingScreen() {
               }),
             );
           return (
-            <View style={styles.row}>
+            <View style={[styles.row, { borderLeftColor: rowOrigin(row) === 'own' ? colors.own : colors.accent }]}>
               <Pressable
                 style={styles.rowMain}
                 onPress={() => updateShoppingEdits((edits) => setChecked(edits, weekKey, row.key, !done))}
@@ -234,7 +249,10 @@ export default function ShoppingScreen() {
                 accessibilityState={{ checked: done }}
               >
                 <View style={[styles.box, done && styles.boxDone]} />
-                <Text style={[type.body, { flex: 1 }, done && styles.struck]}>{row.name}</Text>
+                <View style={styles.nameColumn}>
+                  <Text style={[type.body, done && styles.struck]}>{row.name}</Text>
+                  <Text style={[styles.caption, rowOrigin(row) === 'own' && styles.captionOwn]}>{rowCaption(row)}</Text>
+                </View>
               </Pressable>
               <View style={styles.quantity}>
                 <Pressable
@@ -330,13 +348,19 @@ const styles = StyleSheet.create({
   shareRow: { paddingBottom: spacing.md, gap: spacing.sm },
   aisle: { fontSize: 13, fontWeight: '700', color: colors.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, paddingTop: spacing.md },
   list: { padding: spacing.lg, paddingTop: 0 },
-  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line },
+  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line, borderLeftWidth: 5 },
   rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
   quantity: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   qtyButton: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
   qtyButtonText: { fontSize: 18, color: colors.accent, fontWeight: '600', lineHeight: 22 },
   qtyLabel: { minWidth: 44, textAlign: 'center', fontSize: 14, fontWeight: '600', color: colors.ink },
   edit: { paddingVertical: spacing.md, paddingHorizontal: spacing.sm },
+  nameColumn: { flex: 1 },
+  caption: { fontSize: 12, color: colors.accent },
+  captionOwn: { color: colors.own },
+  legend: { gap: spacing.xs, paddingBottom: spacing.md },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  legendDot: { width: 12, height: 12, borderRadius: 3 },
   restore: { alignItems: 'center', paddingTop: spacing.lg },
   box: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.accent },
   boxDone: { backgroundColor: colors.accent },

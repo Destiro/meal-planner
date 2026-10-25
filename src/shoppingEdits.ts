@@ -1,5 +1,6 @@
 import { aisleFor, matchKey } from './aisles';
 import { formatIngredient, isCountLike, parseIngredient, toBaseUnit } from './ingredients';
+import { formatQuantityLabel } from './quantity';
 import { byName, itemKey, ShoppingItem } from './shopping';
 import { ListEntry, Override, ShoppingEdits, WeekList } from './types';
 
@@ -16,6 +17,8 @@ export interface ListRow extends ShoppingItem {
   edited: boolean;
   /** What the recipes need right now, before your change. Only for planned items. */
   planned?: number;
+  /** The unit `planned` is in, which differs from `unit` if you changed the unit. */
+  plannedUnit?: string;
 }
 
 /** A week's hand-added lines, shaped like list rows. */
@@ -69,9 +72,9 @@ export function applyEdits(planned: ShoppingItem[], week: WeekList = EMPTY_WEEK)
       const follows = base !== undefined && entry.unit === item.unit;
       const quantity = follows ? round(entry.quantity + (item.quantity - base)) : entry.quantity;
       if (quantity <= 0.005) continue;
-      rows.push({ ...entry, quantity, aisle: aisleFor(entry.name), key, kind: 'planned', edited: true, planned: item.quantity });
+      rows.push({ ...entry, quantity, aisle: aisleFor(entry.name), key, kind: 'planned', edited: true, planned: item.quantity, plannedUnit: item.unit });
     } else {
-      rows.push({ ...item, key, kind: 'planned', edited: false, planned: item.quantity });
+      rows.push({ ...item, key, kind: 'planned', edited: false, planned: item.quantity, plannedUnit: item.unit });
     }
   }
   for (const extra of week.extras) {
@@ -261,4 +264,25 @@ export function applyShoppingActions(
  */
 export function clearWeek(edits: ShoppingEdits, weekKey: string, rows: ListRow[]): ShoppingEdits {
   return rows.reduce((acc, row) => removeRow(acc, weekKey, row), edits);
+}
+
+/** Where a line on the list comes from, which decides whether "Cooking for" affects it. */
+export type RowOrigin = 'recipe' | 'adjusted' | 'own';
+
+export function rowOrigin(row: Pick<ListRow, 'kind' | 'edited'>): RowOrigin {
+  if (row.kind === 'extra') return 'own';
+  return row.edited ? 'adjusted' : 'recipe';
+}
+
+/** A short label for a line saying where it comes from, shown under its name. */
+export function rowCaption(row: Pick<ListRow, 'kind' | 'edited' | 'unit' | 'planned' | 'plannedUnit'>): string {
+  const origin = rowOrigin(row);
+  if (origin === 'own') return 'Added by you';
+  if (origin === 'recipe') return 'From recipes';
+  // Say what the recipes need, unless you changed the unit and the two can't be compared.
+  const needs =
+    row.planned !== undefined && row.plannedUnit === row.unit
+      ? ` · recipes need ${formatQuantityLabel(row.planned, row.unit)}`
+      : '';
+  return `Changed by you${needs}`;
 }
