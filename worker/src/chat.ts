@@ -16,6 +16,8 @@ export interface ChatContext {
   /** Names of the meals planned each day, e.g. "Breakfast". */
   slots: string[];
   household: number;
+  /** What is on the shopping list for this week and next, e.g. "3 bags flour". Ticked items end in "(ticked off)". */
+  shopping: { thisWeek: string[]; nextWeek: string[] };
 }
 
 export interface ChatRequest {
@@ -55,6 +57,7 @@ export function parseChatRequest(body: unknown): ChatRequest | { error: string }
 
   const ctx = (typeof context === 'object' && context !== null ? context : {}) as Record<string, unknown>;
   const household = typeof ctx.household === 'number' && ctx.household >= 1 ? Math.min(Math.round(ctx.household), 20) : 2;
+  const shopping = (typeof ctx.shopping === 'object' && ctx.shopping !== null ? ctx.shopping : {}) as Record<string, unknown>;
   return {
     messages: cleaned,
     context: {
@@ -62,6 +65,10 @@ export function parseChatRequest(body: unknown): ChatRequest | { error: string }
       recipes: cleanList(ctx.recipes, MAX_LIST_ITEMS),
       slots: cleanList(ctx.slots, MAX_SLOTS),
       household,
+      shopping: {
+        thisWeek: cleanList(shopping.thisWeek, MAX_LIST_ITEMS),
+        nextWeek: cleanList(shopping.nextWeek, MAX_LIST_ITEMS),
+      },
     },
   };
 }
@@ -122,6 +129,12 @@ Add | 2 bin bags
 Remove | milk
 [[/SHOPPING]]
 
+The shopping lists below (this week and next week) are the person's REAL lists, including everything they typed in themselves. Use them to answer questions about what is on the list, and to find the exact names of things to remove. Items marked "(ticked off)" are already bought. If they say "clear my shopping list", "empty the list" or similar, do NOT list every item: write a single Clear line, and say which week you assumed (this week unless they said next week):
+[[SHOPPING]]
+Clear | everything
+[[/SHOPPING]]
+Use Clear only when they want the whole list emptied. To take off just some items, use Remove lines as described next.
+
 For Add lines, write the amount and item the way the person said it, for example "Add | 1 bag of flour". If the item is already there, the app adds your amount to the existing line, so write only the EXTRA amount, never the new total: if they have 3 bags of flour and ask for "1 more bag of flour", write "Add | 1 bag of flour".
 
 For Remove lines in the PANTRY and SHOPPING blocks: write an amount to take off only that much, or no amount to take the whole item off. Always write the amount to REMOVE, never the amount that should be left. Example: if they have 3 shopping bags on the list and say "remove 2 of the 3 shopping bags", write "Remove | 2 shopping bags" (one bag stays). If they say "take the shopping bags off", write "Remove | shopping bags". If they say they used 200 g of their rice, write "Remove | 200 g rice".
@@ -137,6 +150,12 @@ ${list(context.recipes, '(none yet)')}
 
 Pantry (what they already have at home):
 ${list(context.pantry, '(empty)')}
+
+Shopping list for this week:
+${list(context.shopping.thisWeek, '(empty)')}
+
+Shopping list for next week:
+${list(context.shopping.nextWeek, '(empty)')}
 
 If asked about something unrelated to food, cooking or meal planning, politely say you can only help with that.`;
 }

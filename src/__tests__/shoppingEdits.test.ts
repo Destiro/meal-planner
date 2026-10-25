@@ -1,6 +1,7 @@
 import {
   addExtra,
   applyShoppingActions,
+  clearWeek,
   applyEdits,
   editRow,
   entryFromText,
@@ -255,5 +256,50 @@ describe('applyShoppingActions: adding more of something already there', () => {
       makeId,
     );
     expect(quantities(result.edits)).toEqual([['flour', 2, 'bag']]);
+  });
+});
+
+describe('clearing a week', () => {
+  let n = 0;
+  const makeId = () => `c${++n}`;
+  const rows = () => applyEdits(planned);
+
+  it('clearWeek deletes hand-added lines, hides planned ones and drops their ticks', () => {
+    let edits = addExtra(none, WEEK, { name: 'sunblock', quantity: 1, unit: '' }, 's');
+    edits = setChecked(edits, WEEK, 'extra:s', true);
+    const all = applyEdits(planned, edits[WEEK]);
+    const cleared = clearWeek(edits, WEEK, all);
+    expect(applyEdits(planned, cleared[WEEK])).toEqual([]);
+    expect(cleared[WEEK].extras).toEqual([]);
+    expect(cleared[WEEK].checked).toEqual({});
+    expect(removedCount(planned, cleared[WEEK])).toBe(2);
+  });
+
+  it('planned lines can be brought back with restoreRemoved, hand-added ones cannot', () => {
+    const edits = addExtra(none, WEEK, { name: 'sunblock', quantity: 1, unit: '' }, 's');
+    const cleared = clearWeek(edits, WEEK, applyEdits(planned, edits[WEEK]));
+    expect(applyEdits(planned, restoreRemoved(cleared, WEEK)[WEEK]).map((r) => r.name)).toEqual(['rice', 'tofu']);
+  });
+
+  it('clearing an empty list does nothing', () => {
+    expect(clearWeek(none, WEEK, [])).toEqual(none);
+  });
+
+  it('a Clear action from the assistant empties the list, counting every line', () => {
+    const edits = addExtra(none, WEEK, { name: 'sunblock', quantity: 1, unit: '' }, 's');
+    const result = applyShoppingActions(edits, WEEK, applyEdits(planned, edits[WEEK]), [{ action: 'clear', text: '' }], makeId);
+    expect(result).toMatchObject({ added: 0, removed: 3, reduced: 0 });
+    expect(applyEdits(planned, result.edits[WEEK])).toEqual([]);
+  });
+
+  it('Clear also takes off things added earlier in the same reply, and later adds still work', () => {
+    const result = applyShoppingActions(
+      none,
+      WEEK,
+      rows(),
+      [{ action: 'add', text: 'milk' }, { action: 'clear', text: '' }, { action: 'add', text: 'bread' }],
+      makeId,
+    );
+    expect(applyEdits(planned, result.edits[WEEK]).map((r) => r.name)).toEqual(['bread']);
   });
 });

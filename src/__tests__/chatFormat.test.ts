@@ -1,4 +1,4 @@
-import { parsePantryBlock, parsePlanBlock, parseRecipeBlock, parseReply, planToMeals } from '../chatFormat';
+import { parsePantryBlock, parsePlanBlock, parseRecipeBlock, parseReply, parseShoppingBlock, planToMeals } from '../chatFormat';
 import { Recipe } from '../types';
 
 const SOUP = `[[RECIPE]]
@@ -158,5 +158,30 @@ describe('shopping blocks', () => {
   it('keeps a reply with both a pantry and a shopping block in order', () => {
     const reply = '[[PANTRY]]\nAdd | rice\n[[/PANTRY]]\n[[SHOPPING]]\nAdd | eggs\n[[/SHOPPING]]';
     expect(parseReply(reply).map((s) => s.kind)).toEqual(['pantry', 'shopping']);
+  });
+});
+
+describe('clearing the shopping list', () => {
+  it('reads a Clear line, with or without anything after it', () => {
+    for (const line of ['Clear | everything', 'Clear', 'clear | all', '- Clear |']) {
+      expect(parseShoppingBlock(line)).toEqual([{ action: 'clear', text: '' }]);
+    }
+  });
+
+  it('keeps Add and Remove lines alongside it', () => {
+    expect(parseShoppingBlock('Add | milk\nClear | everything\nRemove | eggs')).toEqual([
+      { action: 'add', text: 'milk' },
+      { action: 'clear', text: '' },
+      { action: 'remove', text: 'eggs' },
+    ]);
+  });
+
+  it('becomes a shopping segment in a reply, but never a pantry one', () => {
+    const shopping = parseReply('Done.\n[[SHOPPING]]\nClear | everything\n[[/SHOPPING]]');
+    expect(shopping.map((s) => s.kind)).toEqual(['text', 'shopping']);
+    expect(shopping[1]).toEqual({ kind: 'shopping', actions: [{ action: 'clear', text: '' }] });
+
+    // A pantry block has no Clear: the line is ignored and the block is shown as plain text.
+    expect(parseReply('[[PANTRY]]\nClear | everything\n[[/PANTRY]]').map((s) => s.kind)).toEqual(['text']);
   });
 });

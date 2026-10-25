@@ -16,13 +16,19 @@ export interface PantryAction {
   text: string;
 }
 
+/** A shopping list change. "clear" empties the whole list, and has no item. */
+export interface ShoppingAction {
+  action: 'add' | 'remove' | 'clear';
+  text: string;
+}
+
 /** A piece of an assistant reply: plain text, a recipe to save, a meal plan or pantry changes to apply. */
 export type Segment =
   | { kind: 'text'; text: string }
   | { kind: 'recipe'; recipe: RecipeInput }
   | { kind: 'plan'; entries: PlanEntry[] }
   | { kind: 'pantry'; actions: PantryAction[] }
-  | { kind: 'shopping'; actions: PantryAction[] };
+  | { kind: 'shopping'; actions: ShoppingAction[] };
 
 /** Drops the markdown the model sometimes adds even though we ask for plain text. */
 const plain = (line: string) =>
@@ -102,6 +108,18 @@ export function parsePantryBlock(block: string): PantryAction[] {
   });
 }
 
+/**
+ * Reads the lines between [[SHOPPING]] markers: Add and Remove as for the pantry, plus "Clear" (with or without
+ * anything after it) to empty the list. Anything else on a Clear line is ignored.
+ */
+export function parseShoppingBlock(block: string): ShoppingAction[] {
+  return block.split('\n').flatMap((rawLine): ShoppingAction[] => {
+    const line = stripBullet(plain(rawLine));
+    if (/^clear\b/i.test(line)) return [{ action: 'clear', text: '' }];
+    return parsePantryBlock(line);
+  });
+}
+
 const BLOCK = /\[\[(RECIPE|PLAN|PANTRY|SHOPPING)\]\]([\s\S]*?)(?:\[\[\/\1\]\]|$)/gi;
 
 /**
@@ -129,11 +147,13 @@ export function parseReply(reply: string): Segment[] {
       const recipe = parseRecipeBlock(match[2]);
       if (recipe) segments.push({ kind: 'recipe', recipe });
       else pushText(match[2]);
-    } else if (match[1].toUpperCase() === 'PANTRY' || match[1].toUpperCase() === 'SHOPPING') {
-      // Pantry and shopping changes share the "Add | item" / "Remove | item" format.
+    } else if (match[1].toUpperCase() === 'PANTRY') {
       const actions = parsePantryBlock(match[2]);
-      const kind = match[1].toUpperCase() === 'PANTRY' ? 'pantry' : 'shopping';
-      if (actions.length) segments.push({ kind, actions });
+      if (actions.length) segments.push({ kind: 'pantry', actions });
+      else pushText(match[2]);
+    } else if (match[1].toUpperCase() === 'SHOPPING') {
+      const actions = parseShoppingBlock(match[2]);
+      if (actions.length) segments.push({ kind: 'shopping', actions });
       else pushText(match[2]);
     } else {
       const entries = parsePlanBlock(match[2]);

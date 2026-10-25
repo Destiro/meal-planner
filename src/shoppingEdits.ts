@@ -150,7 +150,7 @@ export function applyShoppingActions(
   edits: ShoppingEdits,
   weekKey: string,
   rows: ListRow[],
-  actions: { action: 'add' | 'remove'; text: string }[],
+  actions: { action: 'add' | 'remove' | 'clear'; text: string }[],
   makeId: () => string,
 ): { edits: ShoppingEdits; added: number; increased: number; removed: number; reduced: number } {
   let result = edits;
@@ -163,6 +163,17 @@ export function applyShoppingActions(
   const gone = new Set<string>();
 
   for (const { action, text } of actions) {
+    if (action === 'clear') {
+      // Everything on the list now: lines from recipes, hand-added lines, and anything added earlier in this reply.
+      const live = [...extraRows(weekOf(result, weekKey)), ...planned.filter((row) => !gone.has(row.key))];
+      for (const row of live) {
+        result = removeRow(result, weekKey, row);
+        gone.add(row.key);
+      }
+      removed += live.length;
+      continue;
+    }
+
     const entry = entryFromText(text);
     if (!entry) continue;
     const key = matchKey(entry.name);
@@ -222,4 +233,12 @@ export function applyShoppingActions(
     else if (touched) removed++;
   }
   return { edits: result, added, increased, removed, reduced };
+}
+
+/**
+ * Empties a week's shopping list: hand-added lines are deleted and lines from your recipes are hidden (they
+ * can be brought back with "Restore removed items"). Ticks on those lines are cleared too.
+ */
+export function clearWeek(edits: ShoppingEdits, weekKey: string, rows: ListRow[]): ShoppingEdits {
+  return rows.reduce((acc, row) => removeRow(acc, weekKey, row), edits);
 }
