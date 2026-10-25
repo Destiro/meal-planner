@@ -25,6 +25,9 @@ or press `a` to open an Android emulator.
 - `src/components/` – shared UI pieces
 
 ## Development
+    npm start           # deploys the Worker if it changed, then starts Expo
+    npm run start:app   # starts Expo only, without touching the Worker
+    npm run deploy:worker  # deploys the Worker now, even if nothing changed
     npm run check       # typecheck + lint + tests (what CI runs)
     npm run typecheck
     npm run lint
