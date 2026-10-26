@@ -30,7 +30,7 @@ export default function RecipesScreen() {
   // If the last recipe with the chosen tag is deleted or retagged, show everything again.
   const activeTag = tag && allTags.includes(tag) ? tag : null;
   const hasFavourites = recipes.some((r) => r.favourite);
-  // If the last favourite is un-hearted, show everything again.
+  // If the last favourite is un-starred, show everything again.
   const activeFavourites = favouritesOnly && hasFavourites;
   const shown = useMemo(
     () => favouritesFirst(searchRecipes(recipes, query, activeTag, activeFavourites)),
@@ -108,7 +108,7 @@ export default function RecipesScreen() {
                 accessibilityLabel="Favourites"
                 accessibilityState={{ selected: activeFavourites }}
               >
-                <Text style={[styles.chipText, activeFavourites && styles.chipTextActive]}>♥ Favourites</Text>
+                <Text style={[styles.chipText, activeFavourites && styles.chipTextActive]}>★ Favourites</Text>
               </Pressable>
             )}
             {allTags.map((t) => (
@@ -148,7 +148,7 @@ export default function RecipesScreen() {
                 accessibilityLabel={item.favourite ? `Remove ${item.name} from favourites` : `Add ${item.name} to favourites`}
                 accessibilityState={{ selected: !!item.favourite }}
               >
-                <Ionicons name={item.favourite ? 'heart' : 'heart-outline'} size={24} color={item.favourite ? colors.danger : colors.inkSoft} />
+                <Ionicons name={item.favourite ? 'star' : 'star-outline'} size={26} color={item.favourite ? colors.accent : colors.inkSoft} />
               </Pressable>
             </View>
             <Text style={type.small}>
