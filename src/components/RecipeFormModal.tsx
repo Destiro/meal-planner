@@ -33,7 +33,7 @@ export function RecipeFormModal({ recipe, draft, onSave, onDelete, onClose }: Pr
   const [link, setLink] = useState(start?.sourceUrl ?? '');
   const [tags, setTags] = useState(start?.tags?.join(', ') ?? '');
   const [photo, setPhoto] = useState(start?.photo);
-  // Carried through when saving, so editing a favourite never quietly un-stars it.
+  // Carried through when saving, so editing a favourite never quietly un-bookmarks it.
   const [favourite, setFavourite] = useState(!!start?.favourite);
   const [finding, setFinding] = useState(false);
 
@@ -113,7 +113,7 @@ export function RecipeFormModal({ recipe, draft, onSave, onDelete, onClose }: Pr
             accessibilityState={{ checked: favourite }}
             accessibilityLabel="Favourite"
           >
-            <Ionicons name={favourite ? 'star' : 'star-outline'} size={24} color={favourite ? colors.accent : colors.inkSoft} />
+            <Ionicons name={favourite ? 'bookmark' : 'bookmark-outline'} size={24} color={favourite ? colors.accent : colors.inkSoft} />
             <Text style={type.body}>{favourite ? 'Favourite' : 'Mark as a favourite'}</Text>
           </Pressable>
 

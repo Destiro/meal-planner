@@ -30,7 +30,7 @@ export default function RecipesScreen() {
   // If the last recipe with the chosen tag is deleted or retagged, show everything again.
   const activeTag = tag && allTags.includes(tag) ? tag : null;
   const hasFavourites = recipes.some((r) => r.favourite);
-  // If the last favourite is un-starred, show everything again.
+  // If the last favourite is un-bookmarked, show everything again.
   const activeFavourites = favouritesOnly && hasFavourites;
   const shown = useMemo(
     () => favouritesFirst(searchRecipes(recipes, query, activeTag, activeFavourites)),
@@ -108,7 +108,10 @@ export default function RecipesScreen() {
                 accessibilityLabel="Favourites"
                 accessibilityState={{ selected: activeFavourites }}
               >
-                <Text style={[styles.chipText, activeFavourites && styles.chipTextActive]}>★ Favourites</Text>
+                <View style={styles.chipInner}>
+                  <Ionicons name="bookmark" size={14} color={activeFavourites ? '#fff' : colors.accent} />
+                  <Text style={[styles.chipText, activeFavourites && styles.chipTextActive]}>Favourites</Text>
+                </View>
               </Pressable>
             )}
             {allTags.map((t) => (
@@ -148,7 +151,7 @@ export default function RecipesScreen() {
                 accessibilityLabel={item.favourite ? `Remove ${item.name} from favourites` : `Add ${item.name} to favourites`}
                 accessibilityState={{ selected: !!item.favourite }}
               >
-                <Ionicons name={item.favourite ? 'star' : 'star-outline'} size={26} color={item.favourite ? colors.accent : colors.inkSoft} />
+                <Ionicons name={item.favourite ? 'bookmark' : 'bookmark-outline'} size={26} color={item.favourite ? colors.accent : colors.inkSoft} />
               </Pressable>
             </View>
             <Text style={type.small}>
@@ -209,6 +212,7 @@ const styles = StyleSheet.create({
   chips: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
   chip: { paddingVertical: 6, paddingHorizontal: spacing.md, borderRadius: 999, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
   chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chipInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   chipText: { fontSize: 14, fontWeight: '600', color: colors.ink },
   chipTextActive: { color: '#fff' },
   list: { padding: spacing.lg, paddingTop: 0, gap: spacing.md },

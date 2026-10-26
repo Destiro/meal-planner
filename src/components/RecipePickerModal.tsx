@@ -63,7 +63,7 @@ function PickerSheet({ slot, onClose }: { slot: Slot; onClose: () => void }) {
             }}
           >
             <Text style={[type.body, styles.optionName]}>{item.name}</Text>
-            {item.favourite && <Ionicons name="star" size={18} color={colors.accent} accessibilityLabel="Favourite" />}
+            {item.favourite && <Ionicons name="bookmark" size={18} color={colors.accent} accessibilityLabel="Favourite" />}
           </Pressable>
         )}
       />
