@@ -45,6 +45,7 @@ interface StoreValue {
   updateShoppingEdits: (change: (edits: ShoppingEdits) => ShoppingEdits) => void;
   addRecipe: (recipe: RecipeInput) => void;
   updateRecipe: (id: string, recipe: RecipeInput) => void;
+  toggleFavourite: (id: string) => void;
   deleteRecipe: (id: string) => void;
   setMeal: (dateKey: string, meal: MealType, recipeId: string | null) => void;
   copyWeekPlan: (from: Date, to: Date) => void;
@@ -118,6 +119,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setRecipes((prev) => [...prev, { id: uid(), ...recipe }]);
   }, []);
 
+  const toggleFavourite = useCallback((id: string) => {
+    setRecipes((prev) => prev.map((r) => (r.id === id ? { ...r, favourite: !r.favourite } : r)));
+  }, []);
+
   const updateRecipe = useCallback((id: string, recipe: RecipeInput) => {
     setRecipes((prev) => prev.map((r) => (r.id === id ? { id, ...recipe } : r)));
   }, []);
@@ -161,8 +166,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ ready, recipes, plan, settings, shoppingEdits, updateShoppingEdits, pantry, updatePantry, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots }),
-    [ready, recipes, plan, settings, shoppingEdits, updateShoppingEdits, pantry, updatePantry, addRecipe, updateRecipe, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots],
+    () => ({ ready, recipes, plan, settings, shoppingEdits, updateShoppingEdits, pantry, updatePantry, addRecipe, updateRecipe, toggleFavourite, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots }),
+    [ready, recipes, plan, settings, shoppingEdits, updateShoppingEdits, pantry, updatePantry, addRecipe, updateRecipe, toggleFavourite, deleteRecipe, setMeal, copyWeekPlan, setHousehold, setGroupByAisle, setMealSlots],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

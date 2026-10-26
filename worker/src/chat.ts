@@ -13,6 +13,8 @@ export interface ChatContext {
   pantry: string[];
   /** Names of the person's saved recipes. */
   recipes: string[];
+  /** Which of those recipes are marked as favourites. */
+  favourites?: string[];
   /** Names of the meals planned each day, e.g. "Breakfast". */
   slots: string[];
   household: number;
@@ -63,6 +65,7 @@ export function parseChatRequest(body: unknown): ChatRequest | { error: string }
     context: {
       pantry: cleanList(ctx.pantry, MAX_LIST_ITEMS),
       recipes: cleanList(ctx.recipes, MAX_LIST_ITEMS),
+      favourites: cleanList(ctx.favourites, MAX_LIST_ITEMS),
       slots: cleanList(ctx.slots, MAX_SLOTS),
       household,
       shopping: {
@@ -147,6 +150,9 @@ The person cooks for ${context.household} ${context.household === 1 ? 'person' :
 
 Saved recipes:
 ${list(context.recipes, '(none yet)')}
+
+Favourite recipes (these are also in the list above, spelled the same way). When they ask for their favourites, or say "my favourites", use these:
+${list(context.favourites ?? [], '(none marked yet)')}
 
 Pantry (what they already have at home):
 ${list(context.pantry, '(empty)')}

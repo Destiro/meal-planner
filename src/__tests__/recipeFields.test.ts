@@ -1,4 +1,4 @@
-import { normalizeUrl, parseTags, searchRecipes } from '../recipeFields';
+import { favouritesFirst, normalizeUrl, parseTags, searchRecipes } from '../recipeFields';
 import { Recipe } from '../types';
 
 describe('parseTags', () => {
@@ -48,5 +48,28 @@ describe('searchRecipes', () => {
   it('combines with a tag filter and copes with recipes that have no tags', () => {
     expect(ids(searchRecipes(recipes, '', 'quick'))).toEqual(['1', '2']);
     expect(ids(searchRecipes(recipes, 'soup', 'quick'))).toEqual([]);
+  });
+});
+
+describe('favourites', () => {
+  const recipes: Recipe[] = [
+    { id: '1', name: 'Veggie stir fry', servings: 2, ingredients: [], tags: ['quick'] },
+    { id: '2', name: 'Chicken wrap', servings: 2, ingredients: [], favourite: true, tags: ['quick'] },
+    { id: '3', name: 'Lentil soup', servings: 4, ingredients: [], favourite: true },
+    { id: '4', name: 'Pancakes', servings: 4, ingredients: [], favourite: false },
+  ];
+  const ids = (list: Recipe[]) => list.map((r) => r.id);
+
+  it('can be filtered for, together with a search or a tag', () => {
+    expect(ids(searchRecipes(recipes, '', null, true))).toEqual(['2', '3']);
+    expect(ids(searchRecipes(recipes, 'soup', null, true))).toEqual(['3']);
+    expect(ids(searchRecipes(recipes, '', 'quick', true))).toEqual(['2']);
+    expect(ids(searchRecipes(recipes, '', null, false))).toEqual(['1', '2', '3', '4']);
+  });
+
+  it('go first without otherwise reordering, and the original list is untouched', () => {
+    expect(ids(favouritesFirst(recipes))).toEqual(['2', '3', '1', '4']);
+    expect(ids(recipes)).toEqual(['1', '2', '3', '4']);
+    expect(favouritesFirst([])).toEqual([]);
   });
 });

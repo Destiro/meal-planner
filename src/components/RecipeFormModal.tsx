@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -32,6 +33,8 @@ export function RecipeFormModal({ recipe, draft, onSave, onDelete, onClose }: Pr
   const [link, setLink] = useState(start?.sourceUrl ?? '');
   const [tags, setTags] = useState(start?.tags?.join(', ') ?? '');
   const [photo, setPhoto] = useState(start?.photo);
+  // Carried through when saving, so editing a favourite never quietly un-bookmarks it.
+  const [favourite, setFavourite] = useState(!!start?.favourite);
   const [finding, setFinding] = useState(false);
 
   const linkInvalid = link.trim() !== '' && !normalizeUrl(link);
@@ -76,6 +79,7 @@ export function RecipeFormModal({ recipe, draft, onSave, onDelete, onClose }: Pr
       sourceUrl: normalizeUrl(link),
       tags: parseTags(tags),
       photo: savedPhoto,
+      favourite: favourite || undefined,
     });
   };
 
@@ -102,6 +106,16 @@ export function RecipeFormModal({ recipe, draft, onSave, onDelete, onClose }: Pr
 
           <Text style={styles.label}>Name</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. Lentil soup" />
+          <Pressable
+            onPress={() => setFavourite(!favourite)}
+            style={styles.favourite}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: favourite }}
+            accessibilityLabel="Favourite"
+          >
+            <Ionicons name={favourite ? 'bookmark' : 'bookmark-outline'} size={24} color={favourite ? colors.accent : colors.inkSoft} />
+            <Text style={type.body}>{favourite ? 'Favourite' : 'Mark as a favourite'}</Text>
+          </Pressable>
 
           <Text style={styles.label}>Serves (people)</Text>
           <TextInput style={styles.input} value={servings} onChangeText={setServings} keyboardType="number-pad" />
@@ -174,6 +188,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   form: { padding: spacing.lg, gap: spacing.md },
   row: { flexDirection: 'row', gap: spacing.sm },
+  favourite: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
   label: { fontSize: 13, color: colors.inkSoft },
   input: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, padding: spacing.md, fontSize: 15 },
   inputError: { borderColor: colors.danger },
